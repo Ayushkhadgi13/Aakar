@@ -1,37 +1,18 @@
-/* Reset default styles */
 :root {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   
-  /* Aakar Construction Color Palette */
-  --primary-color: #f39c12; /* Safety Orange */
-  --primary-hover: #d35400;
-  --secondary-color: #2c3e50; /* Dark Slate */
-  --bg-color: #ecf0f1;
+  --primary-color: #A65D43; /* Standardized Aakar Logo Color */
+  --primary-hover: #8e4e38;
+  --secondary-color: #2c3e50;
+  --bg-color: #f8f8f6;
   --text-color: #333;
 }
 
 body {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
   background-color: var(--bg-color);
   color: var(--text-color);
-}
-
-a {
-  text-decoration: none;
-  color: var(--secondary-color);
-  transition: 0.3s;
-}
-
-a:hover {
-  color: var(--primary-color);
-}
-
-/* Make inputs look normal again */
-input {
-  background-color: #ffffff;
-  color: #333;
 }

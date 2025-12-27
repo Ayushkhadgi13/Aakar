@@ -3,7 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use App\Http\Controllers\FinanceController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -14,16 +14,10 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
-    Route::post('/email/verification-notification', function (Request $request) {
-        if ($request->user()->hasVerifiedEmail()) {
-            return response()->json(['message' => 'Already verified.'], 400);
-        }
-        $request->user()->sendEmailVerificationNotification();
-        return response()->json(['message' => 'Verification link sent!']);
-    });
+    // Finance Module Routes
+    Route::get('/finance/summary', [FinanceController::class, 'getSummary']);
+    Route::get('/finance/transactions', [FinanceController::class, 'getTransactions']);
+    Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
+    Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
+    Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
 });
-
-Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
-    $request->fulfill();
-    return redirect('http://localhost:5173/dashboard?verified=1');
-})->middleware(['auth:sanctum', 'signed'])->name('verification.verify');
