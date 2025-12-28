@@ -16,6 +16,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Finance Module Routes
     Route::get('/finance/summary', [FinanceController::class, 'getSummary']);
+    Route::get('/finance/reports', [FinanceController::class, 'getMonthlyReports']); // New Route
     Route::get('/finance/transactions', [FinanceController::class, 'getTransactions']);
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);

@@ -50,22 +50,17 @@
 
     <!-- MAIN CONTENT GRID -->
     <div class="main-grid">
-      
-      <!-- LEFT COLUMN: CHARTS -->
       <div class="charts-column">
-        <!-- Balance Overview Chart Placeholder -->
         <div class="chart-card line-chart-box">
           <div class="chart-header">
             <h3>Balance Overview</h3>
             <select class="small-select"><option>This year</option></select>
           </div>
           <div class="visual-placeholder line-viz">
-            <!-- Simulating a trend line with CSS -->
             <div class="line-path"></div>
           </div>
         </div>
 
-        <!-- Budget vs Expense Bar Chart -->
         <div class="chart-card bar-chart-box">
           <div class="chart-header">
             <h3>Budget vs Expense</h3>
@@ -85,12 +80,9 @@
         </div>
       </div>
 
-      <!-- RIGHT COLUMN: STATISTICS & CATEGORIES -->
       <div class="side-column">
         <div class="chart-card stats-box">
           <h3>Expense Statistics</h3>
-          
-          <!-- Custom CSS Donut Chart -->
           <div class="donut-container">
             <div class="donut-ring">
               <div class="donut-center">
@@ -99,7 +91,6 @@
               </div>
             </div>
           </div>
-
           <div class="category-list">
             <div v-for="cat in summary?.category_breakdown" :key="cat.category" class="cat-item">
               <div class="cat-info">
@@ -111,7 +102,6 @@
           </div>
         </div>
 
-        <!-- RECENT TRANSACTIONS MINI TABLE -->
         <div class="chart-card recent-box">
           <h3>Recent Activities</h3>
           <div class="mini-list">
@@ -129,7 +119,46 @@
       </div>
     </div>
 
-    <!-- MODALS (Keeping your existing logic) -->
+    <!-- MONTHLY REPORTS TABLE SECTION -->
+    <section class="reports-section">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Monthly Historical Reports</h3>
+          <p class="report-hint">Automatically generated on the 1st of every month</p>
+        </div>
+
+        <div v-if="reports.length === 0" class="no-reports">
+          No monthly reports have been generated yet.
+        </div>
+
+        <table v-else class="report-table">
+          <thead>
+            <tr>
+              <th>Report Period</th>
+              <th>Total Income</th>
+              <th>Total Expense</th>
+              <th>Net Balance</th>
+              <th>Top Category</th>
+              <th>Activity Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="report in reports" :key="report.id">
+              <td class="period-cell">{{ report.report_month }}</td>
+              <td class="income-cell">Rs. {{ parseFloat(report.total_income).toLocaleString() }}</td>
+              <td class="expense-cell">Rs. {{ parseFloat(report.total_expense).toLocaleString() }}</td>
+              <td :class="['balance-cell', report.net_balance >= 0 ? 'pos' : 'neg']">
+                Rs. {{ parseFloat(report.net_balance).toLocaleString() }}
+              </td>
+              <td>{{ report.top_expense_category }}</td>
+              <td>{{ report.transaction_count }} entries</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MODALS -->
     <div v-if="showTransactionModal" class="modal-overlay">
       <div class="modal-content">
         <h3>New Transaction</h3>
@@ -168,20 +197,27 @@ import axios from 'axios';
 const summary = ref(null);
 const transactions = ref([]);
 const vendors = ref([]);
+const reports = ref([]);
 const showTransactionModal = ref(false);
 const showVendorModal = ref(false);
 
 const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], vendor_id: null });
 
 const loadData = async () => {
-  const [sum, trans, vends] = await Promise.all([
-    axios.get('/finance/summary'),
-    axios.get('/finance/transactions'),
-    axios.get('/finance/vendors')
-  ]);
-  summary.value = sum.data;
-  transactions.value = trans.data;
-  vendors.value = vends.data;
+  try {
+    const [sum, trans, vends, reps] = await Promise.all([
+      axios.get('/finance/summary'),
+      axios.get('/finance/transactions'),
+      axios.get('/finance/vendors'),
+      axios.get('/finance/reports')
+    ]);
+    summary.value = sum.data;
+    transactions.value = trans.data;
+    vendors.value = vends.data;
+    reports.value = reps.data;
+  } catch (err) {
+    console.error("Failed to load finance data", err);
+  }
 };
 
 const saveTransaction = async () => {
@@ -247,6 +283,7 @@ onMounted(loadData);
   display: grid;
   grid-template-columns: 1.8fr 1fr;
   gap: 24px;
+  margin-bottom: 30px;
 }
 
 .chart-card {
@@ -254,34 +291,11 @@ onMounted(loadData);
   padding: 24px;
   border-radius: 24px;
   border: 1px solid #f3f4f6;
-  margin-bottom: 24px;
 }
 
-.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.chart-header h3 { font-size: 16px; font-weight: 700; }
-
-/* VISUAL PLACEHOLDERS */
-.visual-placeholder {
-  height: 200px;
-  background: linear-gradient(to bottom, #f9fafb, #ffffff);
-  border-radius: 16px;
-  position: relative;
-  overflow: hidden;
-}
-
-.line-viz {
-  border-bottom: 2px solid #e5e7eb;
-}
-
-.line-path {
-  position: absolute;
-  bottom: 40px;
-  width: 100%;
-  height: 60px;
-  border-top: 3px solid #6366f1;
-  filter: drop-shadow(0 10px 10px rgba(99, 102, 241, 0.2));
-  border-radius: 50% 50% 0 0;
-}
+.chart-header { display: flex; flex-direction: column; margin-bottom: 20px; }
+.chart-header h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px;}
+.report-hint { font-size: 12px; color: #9ca3af; }
 
 /* BAR CHART */
 .bar-container {
@@ -324,6 +338,18 @@ onMounted(loadData);
 .list-amt { font-weight: 700; font-size: 14px; }
 .list-amt.income { color: #10b981; }
 .list-amt.expense { color: #111827; }
+
+/* REPORTS TABLE */
+.reports-section { margin-top: 20px; }
+.report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.report-table th { text-align: left; padding: 12px; font-size: 12px; color: #6b7280; border-bottom: 2px solid #f3f4f6; }
+.report-table td { padding: 16px 12px; font-size: 14px; border-bottom: 1px solid #f9fafb; }
+.period-cell { font-weight: 700; color: #111827; }
+.income-cell { color: #10b981; font-weight: 600; }
+.expense-cell { color: #ef4444; font-weight: 600; }
+.balance-cell.pos { color: #10b981; font-weight: 800; }
+.balance-cell.neg { color: #ef4444; font-weight: 800; }
+.no-reports { padding: 40px; text-align: center; color: #9ca3af; font-style: italic; }
 
 /* BUTTONS & MODALS */
 .btn-primary { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; }
