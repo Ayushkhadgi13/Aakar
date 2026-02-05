@@ -2,7 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from './components/Login.vue'
 import Register from './components/Register.vue'
 import Dashboard from './components/Dashboard.vue'
-import Finance from './components/Finance.vue' // Import the new module
+import Finance from './components/Finance.vue'
+import Projects from './components/Projects.vue'
+import ProjectDetails from './components/ProjectDetails.vue' // Import this
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -13,8 +15,9 @@ const routes = [
     component: Dashboard, 
     meta: { requiresAuth: true },
     children: [
-      // This allows the Finance module to be rendered inside Dashboard
-      { path: '/finance', component: Finance }
+      { path: '/finance', component: Finance },
+      { path: '/projects', component: Projects },
+      { path: '/projects/:id', component: ProjectDetails } // Dynamic ID route
     ]
   }
 ]

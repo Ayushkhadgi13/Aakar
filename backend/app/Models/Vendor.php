@@ -10,4 +10,9 @@ class Vendor extends Model {
     public function transactions() {
         return $this->hasMany(Transaction::class);
     }
+
+    // Add this relationship
+    public function materials() {
+        return $this->hasMany(VendorMaterial::class);
+    }
 }

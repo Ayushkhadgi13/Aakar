@@ -11,17 +11,19 @@
           </div>
         </div>
 
-        <ul class="nav-menu">
+      <!-- Inside your nav-menu ul -->
+      <ul class="nav-menu">
           <li @click="router.push('/dashboard')" :class="{ active: $route.path === '/dashboard' }">
-            <i class="icon-overview"></i> Overview
+             <i class="icon-overview"></i> Overview
           </li>
           <li @click="router.push('/finance')" :class="{ active: $route.path === '/finance' }">
             <i class="icon-finance"></i> Finance
           </li>
-          <li><i class="icon-projects"></i> Projects</li>
-          <li><i class="icon-inventory"></i> Inventory</li>
-        </ul>
-
+           <li @click="router.push('/projects')" :class="{ active: $route.path === '/projects' }">
+              <i class="icon-projects"></i> Projects
+            </li>
+           <li><i class="icon-inventory"></i> Inventory</li>
+      </ul>
         <div class="user-actions">
           <div class="user-profile">
             <div class="avatar">{{ user?.name?.charAt(0) }}</div>

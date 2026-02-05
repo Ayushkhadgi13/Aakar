@@ -1,6 +1,6 @@
 <template>
   <div class="auth-wrapper">
-    <!-- Removed the Overlay div since we don't have a background image anymore -->
+ 
     
     <div class="auth-card">
       <div class="card-header">

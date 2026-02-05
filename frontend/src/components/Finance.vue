@@ -1,188 +1,174 @@
 <template>
-  <div class="analytics-container">
-    <!-- TOP HEADER -->
-    <header class="analytics-header">
-      <div class="title-group">
-        <h1>Financial Analytics</h1>
-        <p>Detailed overview of Aakar Construction's financial situation</p>
+  <div class="finance-page">
+    <!-- PAGE HEADER -->
+    <header class="finance-header">
+      <div class="header-left">
+        <h1>Financial Insights</h1>
+        <p>Procurement, expenses, and vendor management</p>
       </div>
-      <div class="action-group">
-        <button @click="showVendorModal = true" class="btn-outline">Manage Vendors</button>
-        <button @click="showTransactionModal = true" class="btn-primary">+ Add Transaction</button>
+      <div class="header-right">
+        <button @click="showVendorModal = true" class="btn secondary">Manage Vendors</button>
+        <button @click="showTransactionModal = true" class="btn primary">+ New Transaction</button>
       </div>
     </header>
 
-    <!-- TOP STAT CARDS -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="card-header">
-          <span>Total Balance</span>
-          <span class="currency-tag">NPR</span>
-        </div>
-        <h2>Rs. {{ summary?.total_balance.toLocaleString() }}</h2>
-        <div class="card-footer success">
-          <span class="trend">↑ 12%</span> vs last month
-        </div>
+    <!-- KEY INDICATORS -->
+    <section class="stats-container" v-if="summary">
+      <div class="stat-box balance">
+        <label>Total Balance</label>
+        <div class="value">Rs. {{ summary.total_balance.toLocaleString() }}</div>
+        <div class="trend positive">Overall project liquidity</div>
       </div>
-
-      <div class="stat-card">
-        <div class="card-header">
-          <span>Total Income</span>
-          <span class="currency-tag">NPR</span>
-        </div>
-        <h2>Rs. {{ summary?.total_income.toLocaleString() }}</h2>
-        <div class="card-footer success">
-          <span class="trend">↑ 8%</span> vs last month
-        </div>
+      <div class="stat-box income">
+        <label>Total Revenue</label>
+        <div class="value">Rs. {{ summary.total_income.toLocaleString() }}</div>
+        <div class="trend positive">↑ Active Inflow</div>
       </div>
-
-      <div class="stat-card">
-        <div class="card-header">
-          <span>Total Expense</span>
-          <span class="currency-tag">NPR</span>
-        </div>
-        <h2>Rs. {{ summary?.total_expense.toLocaleString() }}</h2>
-        <div class="card-footer danger">
-          <span class="trend">↑ 2.4%</span> vs last month
-        </div>
-      </div>
-    </div>
-
-    <!-- MAIN CONTENT GRID -->
-    <div class="main-grid">
-      <div class="charts-column">
-        <div class="chart-card line-chart-box">
-          <div class="chart-header">
-            <h3>Balance Overview</h3>
-            <select class="small-select"><option>This year</option></select>
-          </div>
-          <div class="visual-placeholder line-viz">
-            <div class="line-path"></div>
-          </div>
-        </div>
-
-        <div class="chart-card bar-chart-box">
-          <div class="chart-header">
-            <h3>Budget vs Expense</h3>
-            <div class="legend">
-              <span class="dot income"></span> Income <span class="dot expense"></span> Expense
-            </div>
-          </div>
-          <div class="bar-container">
-            <div v-for="stat in summary?.monthly_stats" :key="stat.month" class="bar-group">
-              <div class="bars">
-                <div class="bar inc" :style="{ height: (stat.income / 1000) + 'px' }"></div>
-                <div class="bar exp" :style="{ height: (stat.expense / 1000) + 'px' }"></div>
-              </div>
-              <span class="month-label">{{ stat.month.substring(0,3) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="side-column">
-        <div class="chart-card stats-box">
-          <h3>Expense Statistics</h3>
-          <div class="donut-container">
-            <div class="donut-ring">
-              <div class="donut-center">
-                <small>Total Exp</small>
-                <strong>{{ summary?.total_expense }}</strong>
-              </div>
-            </div>
-          </div>
-          <div class="category-list">
-            <div v-for="cat in summary?.category_breakdown" :key="cat.category" class="cat-item">
-              <div class="cat-info">
-                <span class="dot" :style="{ backgroundColor: getRandomColor() }"></span>
-                <span class="cat-name">{{ cat.category }}</span>
-              </div>
-              <span class="cat-val">Rs. {{ parseFloat(cat.total).toLocaleString() }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="chart-card recent-box">
-          <h3>Recent Activities</h3>
-          <div class="mini-list">
-            <div v-for="t in summary?.recent_transactions" :key="t.id" class="list-row">
-              <div class="list-main">
-                <span class="list-title">{{ t.category }}</span>
-                <small>{{ t.vendor?.name || 'Internal' }}</small>
-              </div>
-              <span :class="['list-amt', t.type]">
-                {{ t.type === 'income' ? '+' : '-' }} {{ t.amount }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- MONTHLY REPORTS TABLE SECTION -->
-    <section class="reports-section">
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>Monthly Historical Reports</h3>
-          <p class="report-hint">Automatically generated on the 1st of every month</p>
-        </div>
-
-        <div v-if="reports.length === 0" class="no-reports">
-          No monthly reports have been generated yet.
-        </div>
-
-        <table v-else class="report-table">
-          <thead>
-            <tr>
-              <th>Report Period</th>
-              <th>Total Income</th>
-              <th>Total Expense</th>
-              <th>Net Balance</th>
-              <th>Top Category</th>
-              <th>Activity Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="report in reports" :key="report.id">
-              <td class="period-cell">{{ report.report_month }}</td>
-              <td class="income-cell">Rs. {{ parseFloat(report.total_income).toLocaleString() }}</td>
-              <td class="expense-cell">Rs. {{ parseFloat(report.total_expense).toLocaleString() }}</td>
-              <td :class="['balance-cell', report.net_balance >= 0 ? 'pos' : 'neg']">
-                Rs. {{ parseFloat(report.net_balance).toLocaleString() }}
-              </td>
-              <td>{{ report.top_expense_category }}</td>
-              <td>{{ report.transaction_count }} entries</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="stat-box prepayment">
+        <label>Pre-Payments</label>
+        <div class="value">Rs. {{ summary.total_prepayment.toLocaleString() }}</div>
+        <div class="trend highlight">Future Outflow Booked</div>
       </div>
     </section>
 
-    <!-- MODALS -->
-    <div v-if="showTransactionModal" class="modal-overlay">
-      <div class="modal-content">
-        <h3>New Transaction</h3>
-        <form @submit.prevent="saveTransaction">
-          <div class="form-row">
-            <div class="f-group">
-              <label>Type</label>
-              <select v-model="formT.type" required>
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-              </select>
-            </div>
-            <div class="f-group">
-              <label>Amount</label>
-              <input type="number" v-model="formT.amount" required />
+    <!-- VENDOR & MATERIALS DIRECTORY -->
+    <section class="content-section">
+      <div class="section-header">
+        <h2>Vendor & Material Directory</h2>
+        <div class="badge">{{ vendors.length }} Active Vendors</div>
+      </div>
+
+      <div v-if="vendors.length === 0" class="empty-state">
+        <div class="empty-icon">🏗️</div>
+        <p>No vendor records found. Start by adding a supplier.</p>
+      </div>
+
+      <div class="vendor-grid">
+        <div v-for="vendor in vendors" :key="vendor.id" class="v-card">
+          <div class="v-card-head">
+            <div class="v-avatar">{{ vendor.name.charAt(0) }}</div>
+            <div class="v-info">
+              <h3>{{ vendor.name }}</h3>
+              <p>{{ vendor.contact_person || 'No Contact' }} • {{ vendor.phone || 'No Phone' }}</p>
             </div>
           </div>
-          <label>Category</label>
-          <input type="text" v-model="formT.category" placeholder="Salary, Materials, etc." required />
-          <label>Date</label>
-          <input type="date" v-model="formT.date" required />
-          <div class="modal-btns">
-            <button type="submit" class="btn-primary">Add Now</button>
-            <button type="button" @click="showTransactionModal = false" class="btn-outline">Cancel</button>
+          
+          <div class="v-card-body">
+            <table class="mat-table">
+              <thead>
+                <tr>
+                  <th>Material Item</th>
+                  <th>Unit Price</th>
+                  <th>Qty</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in vendor.materials" :key="m.id">
+                  <td>{{ m.material_name }}</td>
+                  <td>Rs. {{ m.unit_price }}</td>
+                  <td>{{ m.quantity }}</td>
+                  <td class="text-right highlight">Rs. {{ m.total_price }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="v-card-footer">
+            <span>Procurement Value</span>
+            <strong>Rs. {{ calculateVendorTotal(vendor.materials).toLocaleString() }}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VENDOR MODAL -->
+    <div v-if="showVendorModal" class="modal-backdrop">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h3>Vendor Registration</h3>
+          <button class="close-btn" @click="showVendorModal = false">×</button>
+        </div>
+        <form @submit.prevent="saveVendor">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Company/Vendor Name</label>
+              <input type="text" v-model="formV.name" required placeholder="Birat Steel Industry" />
+            </div>
+            <div class="form-group">
+              <label>Phone Number</label>
+              <input type="text" v-model="formV.phone" placeholder="98XXXXXXXX" />
+            </div>
+            <div class="form-group full">
+              <label>Contact Person Name</label>
+              <input type="text" v-model="formV.contact_person" placeholder="Manager Name" />
+            </div>
+          </div>
+
+          <div class="material-builder">
+            <div class="builder-top">
+              <label>Materials & Pricing</label>
+              <button type="button" @click="addMaterialField" class="btn-text">+ Add Row</button>
+            </div>
+            <div v-for="(mat, index) in formV.materials" :key="index" class="builder-row">
+              <div class="input-col">
+                <input type="text" v-model="mat.material_name" placeholder="Item Name" required />
+              </div>
+              <div class="input-col small">
+                <input type="number" v-model="mat.unit_price" placeholder="Price" min="0" step="0.01" required />
+              </div>
+              <div class="input-col small">
+                <input type="number" v-model="mat.quantity" placeholder="Qty" min="1" required />
+              </div>
+              <button type="button" @click="removeMaterialField(index)" class="btn-icon-del" :disabled="formV.materials.length === 1">×</button>
+            </div>
+          </div>
+
+          <div class="modal-footer action-btns">
+            <button type="button" @click="showVendorModal = false" class="btn secondary">Cancel</button>
+            <button type="submit" class="btn-save">Save Record</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TRANSACTION MODAL -->
+    <div v-if="showTransactionModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Record Transaction</h3>
+          <button class="close-btn" @click="showTransactionModal = false">×</button>
+        </div>
+        <form @submit.prevent="saveTransaction">
+          <div class="form-group">
+            <label>Type</label>
+            <select v-model="formT.type" required @change="validateDateOnTypeChange">
+              <option value="income">Income (Payment Received)</option>
+              <option value="expense">Expense (Payment Sent)</option>
+              <option value="pre-payment">Pre-payment (Future/Advance)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Amount (Rs.)</label>
+            <input type="number" v-model="formT.amount" min="0" required />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" v-model="formT.category" placeholder="e.g. Labor, Fuel, Cement" required />
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input 
+              type="date" 
+              v-model="formT.date" 
+              :max="formT.type !== 'pre-payment' ? todayDate : null"
+              required 
+            />
+            <small v-if="formT.type !== 'pre-payment'" class="hint">Standard transactions cannot be in the future.</small>
+            <small v-else class="hint accent">Future dates allowed for pre-payments.</small>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn-save full-width">Post Transaction</button>
           </div>
         </form>
       </div>
@@ -191,178 +177,157 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 
 const summary = ref(null);
-const transactions = ref([]);
 const vendors = ref([]);
-const reports = ref([]);
-const showTransactionModal = ref(false);
 const showVendorModal = ref(false);
+const showTransactionModal = ref(false);
 
-const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], vendor_id: null });
+const todayDate = new Date().toISOString().split('T')[0];
+
+const formT = ref({ 
+  type: 'expense', 
+  amount: '', 
+  category: '', 
+  date: todayDate 
+});
+
+const formV = ref({ 
+  name: '', 
+  contact_person: '', 
+  phone: '', 
+  materials: [{ material_name: '', unit_price: null, quantity: null }] 
+});
 
 const loadData = async () => {
   try {
-    const [sum, trans, vends, reps] = await Promise.all([
-      axios.get('/finance/summary'),
-      axios.get('/finance/transactions'),
-      axios.get('/finance/vendors'),
-      axios.get('/finance/reports')
-    ]);
+    const [sum, vends] = await Promise.all([axios.get('/finance/summary'), axios.get('/finance/vendors')]);
     summary.value = sum.data;
-    transactions.value = trans.data;
     vendors.value = vends.data;
-    reports.value = reps.data;
-  } catch (err) {
-    console.error("Failed to load finance data", err);
+  } catch (error) {
+    console.error("Failed to load data", error);
+  }
+};
+
+const validateDateOnTypeChange = () => {
+  // If user switches from pre-payment to expense, and the date was in the future, reset it to today
+  if (formT.value.type !== 'pre-payment' && formT.value.date > todayDate) {
+    formT.value.date = todayDate;
+  }
+}
+
+const calculateVendorTotal = (mats) => mats.reduce((acc, m) => acc + parseFloat(m.total_price), 0);
+
+const addMaterialField = () => formV.value.materials.push({ material_name: '', unit_price: null, quantity: null });
+const removeMaterialField = (index) => formV.value.materials.splice(index, 1);
+
+const saveVendor = async () => {
+  try {
+    await axios.post('/finance/vendors', formV.value);
+    showVendorModal.value = false;
+    formV.value = { name: '', contact_person: '', phone: '', materials: [{ material_name: '', unit_price: null, quantity: null }] };
+    loadData();
+  } catch (error) {
+    alert("Check inputs: Price must be >= 0 and Quantity >= 1");
   }
 };
 
 const saveTransaction = async () => {
-  await axios.post('/finance/transactions', formT.value);
-  showTransactionModal.value = false;
-  loadData();
-};
-
-const getRandomColor = () => {
-  const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
-  return colors[Math.floor(Math.random() * colors.length)];
+  try {
+    await axios.post('/finance/transactions', formT.value);
+    showTransactionModal.value = false;
+    formT.value = { type: 'expense', amount: '', category: '', date: todayDate };
+    loadData();
+  } catch (error) {
+    const msg = error.response?.data?.message || "Failed to save transaction.";
+    alert(msg);
+  }
 };
 
 onMounted(loadData);
 </script>
 
 <style scoped>
-.analytics-container {
-  padding: 10px;
-  background: #fcfcfd;
-  min-height: 100vh;
-  font-family: 'Inter', sans-serif;
-}
+.finance-page { padding: 40px; background: #f8fafc; min-height: 100vh; color: #1e293b; }
 
-.analytics-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-}
+/* HEADER */
+.finance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+.finance-header h1 { font-size: 28px; font-weight: 800; margin: 0; color: #0f172a; }
+.finance-header p { color: #64748b; margin: 5px 0 0; }
 
-.title-group h1 { font-size: 24px; font-weight: 700; color: #111827; margin: 0; }
-.title-group p { color: #6b7280; font-size: 14px; margin-top: 5px; }
+/* STATS */
+.stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-bottom: 40px; }
+.stat-box { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
+.stat-box label { font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-box .value { font-size: 26px; font-weight: 800; margin: 10px 0; color: #0f172a; }
+.trend { font-size: 12px; font-weight: 600; }
+.positive { color: #10b981; }
+.negative { color: #ef4444; }
+.highlight { color: #A65D43; }
 
-.action-group { display: flex; gap: 12px; }
+/* VENDOR GRID */
+.section-header { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
+.section-header h2 { font-size: 20px; font-weight: 700; margin: 0; }
+.badge { background: #e2e8f0; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #475569; }
 
-/* STAT CARDS */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  margin-bottom: 30px;
-}
+.vendor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 25px; }
+.v-card { background: white; border-radius: 24px; border: 1px solid #f1f5f9; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.04); transition: 0.3s; }
+.v-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08); }
 
-.stat-card {
-  background: white;
-  padding: 24px;
-  border-radius: 20px;
-  border: 1px solid #f3f4f6;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
+.v-card-head { padding: 20px; display: flex; align-items: center; gap: 15px; background: #fafafa; border-bottom: 1px solid #f1f5f9; }
+.v-avatar { width: 45px; height: 45px; background: #1e293b; color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: 800; font-size: 20px; }
+.v-info h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.v-info p { margin: 3px 0 0; font-size: 13px; color: #64748b; }
 
-.card-header { display: flex; justify-content: space-between; color: #6b7280; font-weight: 600; font-size: 14px; }
-.currency-tag { background: #f3f4f6; padding: 2px 8px; border-radius: 6px; font-size: 10px; }
-.stat-card h2 { font-size: 28px; margin: 15px 0; color: #111827; }
-.card-footer { font-size: 13px; color: #9ca3af; }
-.trend { font-weight: 700; margin-right: 5px; }
-.success .trend { color: #10b981; }
-.danger .trend { color: #ef4444; }
+.v-card-body { padding: 0 20px; }
+.mat-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px; }
+.mat-table th { text-align: left; color: #94a3b8; font-weight: 600; padding-bottom: 10px; }
+.mat-table td { padding: 10px 0; border-bottom: 1px solid #f8fafc; }
+.highlight { font-weight: 700; color: #0f172a; }
+.text-right { text-align: right; }
 
-/* MAIN GRID */
-.main-grid {
-  display: grid;
-  grid-template-columns: 1.8fr 1fr;
-  gap: 24px;
-  margin-bottom: 30px;
-}
+.v-card-footer { padding: 15px 20px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; }
+.v-card-footer span { font-size: 12px; font-weight: 600; color: #64748b; }
+.v-card-footer strong { font-size: 16px; color: #A65D43; font-weight: 800; }
 
-.chart-card {
-  background: white;
-  padding: 24px;
-  border-radius: 24px;
-  border: 1px solid #f3f4f6;
-}
+/* MODALS */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.modal-card { background: white; width: 450px; border-radius: 28px; padding: 35px; position: relative; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+.wide { width: 700px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #94a3b8; }
 
-.chart-header { display: flex; flex-direction: column; margin-bottom: 20px; }
-.chart-header h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px;}
-.report-hint { font-size: 12px; color: #9ca3af; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.form-group.full { grid-column: span 2; }
+.form-group label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #475569; }
+.hint { display: block; font-size: 11px; margin-top: 5px; color: #94a3b8; }
+.hint.accent { color: #A65D43; font-weight: 600; }
+input, select { width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #e2e8f0; font-size: 14px; transition: 0.2s; box-sizing: border-box; }
+input:focus { border-color: #A65D43; outline: none; }
 
-/* BAR CHART */
-.bar-container {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-  height: 150px;
-  padding-top: 20px;
-}
+/* MATERIAL BUILDER */
+.material-builder { background: #f8fafc; padding: 20px; border-radius: 20px; margin: 25px 0; border: 1.5px solid #e2e8f0; }
+.builder-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.builder-top label { font-size: 13px; font-weight: 800; color: #1e293b; }
+.builder-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; width: 100%; }
+.input-col { flex: 2; }
+.input-col.small { flex: 1; }
+.btn-icon-del { background: #fee2e2; color: #ef4444; border: none; width: 35px; height: 35px; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.btn-icon-del:hover:not(:disabled) { background: #ef4444; color: white; }
+.btn-icon-del:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-text { background: transparent; color: #A65D43; border: none; font-weight: 700; font-size: 13px; cursor: pointer; }
 
-.bar-group { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.bars { display: flex; gap: 4px; align-items: flex-end; }
-.bar { width: 12px; border-radius: 4px; transition: 0.3s; }
-.bar.inc { background: #c7d2fe; }
-.bar.exp { background: #6366f1; }
-.month-label { font-size: 11px; color: #9ca3af; font-weight: 600; }
+/* FOOTER BUTTONS */
+.action-btns { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.btn { padding: 12px 25px; border-radius: 14px; font-weight: 700; cursor: pointer; border: none; transition: 0.2s; font-size: 14px; }
+.primary { background: #A65D43; color: white; }
+.secondary { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; }
+.btn-save { background: #0f172a; color: white; border: none; padding: 12px 30px; border-radius: 14px; font-weight: 700; cursor: pointer; font-size: 14px; }
+.btn-save:hover { background: #1e293b; transform: translateY(-1px); }
+.full-width { width: 100%; margin-top: 15px; }
 
-/* DONUT CHART SIMULATION */
-.donut-container { display: flex; justify-content: center; margin: 20px 0; }
-.donut-ring {
-  width: 150px; height: 150px;
-  border-radius: 50%;
-  border: 15px solid #f3f4f6;
-  border-top-color: #6366f1;
-  border-right-color: #8b5cf6;
-  display: flex; align-items: center; justify-content: center;
-}
-.donut-center { text-align: center; }
-.donut-center strong { display: block; font-size: 18px; }
-
-.category-list { margin-top: 20px; }
-.cat-item { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
-.cat-info { display: flex; align-items: center; gap: 10px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; }
-
-/* RECENT LIST */
-.list-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9fafb; }
-.list-title { font-weight: 600; color: #111827; display: block; font-size: 14px; }
-.list-main small { color: #9ca3af; font-size: 12px; }
-.list-amt { font-weight: 700; font-size: 14px; }
-.list-amt.income { color: #10b981; }
-.list-amt.expense { color: #111827; }
-
-/* REPORTS TABLE */
-.reports-section { margin-top: 20px; }
-.report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-.report-table th { text-align: left; padding: 12px; font-size: 12px; color: #6b7280; border-bottom: 2px solid #f3f4f6; }
-.report-table td { padding: 16px 12px; font-size: 14px; border-bottom: 1px solid #f9fafb; }
-.period-cell { font-weight: 700; color: #111827; }
-.income-cell { color: #10b981; font-weight: 600; }
-.expense-cell { color: #ef4444; font-weight: 600; }
-.balance-cell.pos { color: #10b981; font-weight: 800; }
-.balance-cell.neg { color: #ef4444; font-weight: 800; }
-.no-reports { padding: 40px; text-align: center; color: #9ca3af; font-style: italic; }
-
-/* BUTTONS & MODALS */
-.btn-primary { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; }
-.btn-outline { background: white; border: 1px solid #e5e7eb; padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; }
-
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.modal-content { background: white; padding: 32px; border-radius: 24px; width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
-.form-row { display: flex; gap: 15px; margin-bottom: 15px; }
-.f-group { flex: 1; }
-input, select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #e5e7eb; margin: 8px 0 16px; }
-
-@media (max-width: 1200px) {
-  .main-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: 1fr; }
-}
+.empty-state { text-align: center; padding: 80px 0; background: white; border-radius: 30px; border: 2px dashed #e2e8f0; }
+.empty-icon { font-size: 50px; margin-bottom: 15px; }
 </style>
