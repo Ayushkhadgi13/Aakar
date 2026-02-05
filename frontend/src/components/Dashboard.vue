@@ -2,105 +2,99 @@
   <div class="dashboard-wrapper">
     <!-- TOP NAVIGATION BAR -->
     <nav class="top-navbar">
-      <div class="nav-container">
+      <div class="nav-inner">
         <div class="brand-box">
           <div class="logo-icon">A</div>
-          <div class="brand-text">
-            <span class="logo-main">AAKAR</span>
-            <span class="logo-sub">CONSTRUCTION</span>
-          </div>
+          <div class="brand-text">AAKAR</div>
         </div>
 
-      <!-- Inside your nav-menu ul -->
-      <ul class="nav-menu">
-          <li @click="router.push('/dashboard')" :class="{ active: $route.path === '/dashboard' }">
-             <i class="icon-overview"></i> Overview
-          </li>
-          <li @click="router.push('/finance')" :class="{ active: $route.path === '/finance' }">
-            <i class="icon-finance"></i> Finance
-          </li>
-           <li @click="router.push('/projects')" :class="{ active: $route.path === '/projects' }">
-              <i class="icon-projects"></i> Projects
-            </li>
-           <li><i class="icon-inventory"></i> Inventory</li>
-      </ul>
+        <div class="nav-links">
+          <button @click="router.push('/dashboard')" :class="['nav-item', { active: $route.path === '/dashboard' }]">Overview</button>
+          <button @click="router.push('/finance')" :class="['nav-item', { active: $route.path === '/finance' }]">Finance</button>
+          <button @click="router.push('/projects')" :class="['nav-item', { active: $route.path === '/projects' }]">Projects</button>
+          <button class="nav-item disabled">Inventory</button>
+        </div>
+
         <div class="user-actions">
-          <div class="user-profile">
-            <div class="avatar">{{ user?.name?.charAt(0) }}</div>
-            <div class="user-info">
-              <span class="u-name">{{ user?.name }}</span>
-              <span class="u-role">Administrator</span>
-            </div>
+          <div class="profile-info">
+            <span class="user-name">{{ user?.name || 'Admin' }}</span>
+            <span class="user-role">Administrator</span>
           </div>
-          <button @click="logout" class="logout-pill">Sign Out</button>
+          <div class="avatar">{{ user?.name?.charAt(0) || 'A' }}</div>
+          <button @click="logout" class="logout-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
         </div>
       </div>
     </nav>
 
-    <!-- MAIN CONTENT AREA -->
-    <main class="main-stage">
-      <router-view v-if="$route.path !== '/dashboard'"></router-view>
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in"><component :is="Component" /></transition>
+      </router-view>
       
-      <div v-else class="overview-layout">
-        <header class="content-header">
-          <div class="welcome-msg">
-            <h1>Workspace Overview</h1>
-            <p>Welcome back, <strong>{{ user?.name }}</strong>. Here is what's happening today.</p>
+      <div v-if="$route.path === '/dashboard'" class="overview-container">
+        <header class="page-header">
+          <div class="header-text">
+            <h1>Dashboard Overview</h1>
+            <p>Visualizing your construction metrics and financial health.</p>
           </div>
-          <div class="date-display">{{ new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }}</div>
+          <div class="date-pill">📅 {{ new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}</div>
         </header>
 
-        <!-- STATS GRID -->
-        <div class="dashboard-grid">
-          <!-- Financial Snapshot -->
-          <div class="glass-card finance-card" @click="router.push('/finance')">
-            <div class="card-label">Financial Snapshot</div>
-            <div class="stat-flex">
-              <div class="stat-group">
-                <small>Monthly Income</small>
-                <span class="val positive">Rs. {{ summary?.total_income?.toLocaleString() || 0 }}</span>
-              </div>
-              <div class="divider"></div>
-              <div class="stat-group">
-                <small>Monthly Expenses</small>
-                <span class="val negative">Rs. {{ summary?.total_expense?.toLocaleString() || 0 }}</span>
-              </div>
+        <!-- KPI CARDS -->
+        <div class="kpi-grid">
+          <div class="kpi-card" @click="router.push('/finance')">
+            <div class="icon-wrapper income">💰</div>
+            <div class="kpi-data">
+              <span class="kpi-label">Monthly Income</span>
+              <div class="kpi-value">Rs. {{ summary?.total_income?.toLocaleString() || 0 }}</div>
             </div>
-            <div class="card-footer">View detailed analytics →</div>
           </div>
-
-          <!-- Project Status Placeholder -->
-          <div class="glass-card info-card">
-            <div class="card-label">Active Projects</div>
-            <div class="big-num">04</div>
-            <div class="progress-bar"><div class="fill" style="width: 65%"></div></div>
-            <p class="status-note">2 projects nearing deadline</p>
-          </div>
-
-          <!-- Inventory Status Placeholder -->
-          <div class="glass-card info-card">
-            <div class="card-label">Inventory Alerts</div>
-            <div class="alert-box">
-              <span class="alert-icon">!</span>
-              <p>Low stock on Structural Steel (Site B)</p>
+          <div class="kpi-card" @click="router.push('/finance')">
+            <div class="icon-wrapper expense">📉</div>
+            <div class="kpi-data">
+              <span class="kpi-label">Monthly Expenses</span>
+              <div class="kpi-value">Rs. {{ summary?.total_expense?.toLocaleString() || 0 }}</div>
             </div>
-            <div class="card-footer">Check Inventory</div>
+          </div>
+          <div class="kpi-card highlight" @click="router.push('/projects')">
+            <div class="icon-wrapper project">🏗️</div>
+            <div class="kpi-data">
+              <span class="kpi-label">Active Projects</span>
+              <div class="kpi-value link">{{ projectCount }} Projects</div>
+            </div>
           </div>
         </div>
 
-        <!-- RECENT ACTIVITY TABLE MOCKUP -->
-        <div class="recent-activity-section glass-card">
-          <div class="card-label">Recent Project Logs</div>
-          <div class="mock-table">
-            <div class="t-row header">
-              <span>Project Name</span>
-              <span>Supervisor</span>
-              <span>Status</span>
-              <span>Update</span>
+        <!-- CHARTS SECTION -->
+        <div class="charts-grid">
+          <div class="chart-card main-chart">
+            <div class="chart-header">
+              <h3>Financial Trend</h3>
+              <span>Last 6 Months</span>
             </div>
-            <div class="t-row empty">
-              <p>No recent activity logs found for this week.</p>
+            <!-- APEX CHART COMPONENT -->
+            <apexchart 
+              type="area" 
+              height="300" 
+              :options="financeChartOptions" 
+              :series="financeSeries"
+            ></apexchart>
+          </div>
+
+          <div class="chart-card side-chart">
+            <div class="chart-header">
+              <h3>Project Status</h3>
+              <span>Distribution</span>
             </div>
+            <apexchart 
+              type="donut" 
+              height="320" 
+              :options="statusChartOptions" 
+              :series="statusSeries"
+            ></apexchart>
           </div>
         </div>
       </div>
@@ -109,35 +103,70 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+// Import the chart component
+import apexchart from "vue3-apexcharts";
 
 const router = useRouter();
 const user = ref(null);
 const summary = ref(null);
+const projects = ref([]);
+
+const projectCount = computed(() => projects.value.length);
+
+// Finance Chart Configuration
+const financeSeries = computed(() => [
+  { name: 'Income', data: summary.value?.monthly_stats?.map(s => s.income) || [0,0,0,0,0,0] },
+  { name: 'Expense', data: summary.value?.monthly_stats?.map(s => s.expense) || [0,0,0,0,0,0] }
+]);
+
+const financeChartOptions = {
+  chart: { toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+  colors: ['#10B981', '#EF4444'],
+  dataLabels: { enabled: false },
+  stroke: { curve: 'smooth', width: 3 },
+  fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0 } },
+  xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], axisBorder: { show: false } },
+  grid: { borderColor: '#f1f5f9' }
+};
+
+// Project Status Configuration
+const statusSeries = computed(() => {
+  const counts = { 'In Progress': 0, 'Upcoming': 0, 'Completed': 0, 'On Hold': 0 };
+  projects.value.forEach(p => {
+    if(counts[p.status] !== undefined) counts[p.status]++;
+  });
+  return Object.values(counts);
+});
+
+const statusChartOptions = {
+  labels: ['In Progress', 'Upcoming', 'Completed', 'On Hold'],
+  colors: ['#A65D43', '#94A3B8', '#10B981', '#F59E0B'],
+  chart: { fontFamily: 'Plus Jakarta Sans' },
+  legend: { position: 'bottom' },
+  dataLabels: { enabled: false },
+  plotOptions: { pie: { donut: { size: '75%' } } }
+};
 
 const fetchData = async () => {
   try {
-    const userRes = await axios.get('/user');
+    const [userRes, sumRes, projRes] = await Promise.all([
+      axios.get('/user'),
+      axios.get('/finance/summary'),
+      axios.get('/projects')
+    ]);
     user.value = userRes.data;
-
-    try {
-      const sumRes = await axios.get('/finance/summary');
-      summary.value = sumRes.data;
-    } catch (e) {
-      console.error("Finance summary load failed");
-    }
+    summary.value = sumRes.data;
+    projects.value = projRes.data;
   } catch (e) {
-    localStorage.clear();
-    router.push('/login');
+    if(e.response?.status === 401) { localStorage.clear(); router.push('/login'); }
   }
 };
 
 const logout = async () => {
-  try {
-    await axios.post('/logout');
-  } catch (e) {}
+  try { await axios.post('/logout'); } catch (e) {}
   localStorage.clear();
   router.push('/login');
 };
@@ -146,250 +175,50 @@ onMounted(fetchData);
 </script>
 
 <style scoped>
-.dashboard-wrapper {
-  min-height: 100vh;
-  background-color: #f4f7f9;
-  font-family: 'Inter', system-ui, sans-serif;
-}
+.dashboard-wrapper { min-height: 100vh; }
+.top-navbar { position: fixed; top: 0; left: 0; width: 100%; height: 80px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.nav-inner { width: 100%; max-width: 1400px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
+.brand-box { display: flex; align-items: center; gap: 12px; }
+.logo-icon { width: 40px; height: 40px; background: var(--primary); color: white; font-weight: 800; display: flex; align-items: center; justify-content: center; border-radius: 10px; box-shadow: 0 4px 10px rgba(166, 93, 67, 0.3); }
+.brand-text { font-weight: 800; font-size: 1.2rem; color: var(--text-main); }
+.nav-links { display: flex; background: #F1F5F9; padding: 5px; border-radius: 12px; gap: 5px; }
+.nav-item { background: transparent; border: none; padding: 8px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: var(--text-body); cursor: pointer; transition: 0.2s; }
+.nav-item:hover { background: rgba(255,255,255,0.5); }
+.nav-item.active { background: white; color: var(--text-main); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.nav-item.disabled { opacity: 0.5; cursor: not-allowed; }
+.user-actions { display: flex; align-items: center; gap: 16px; }
+.profile-info { text-align: right; }
+.user-name { display: block; font-weight: 700; font-size: 0.9rem; }
+.user-role { font-size: 0.75rem; color: var(--text-muted); }
+.avatar { width: 42px; height: 42px; background: var(--text-main); color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.logout-btn { border: 1px solid var(--border); background: white; color: var(--text-muted); padding: 10px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+.logout-btn:hover { background: #FEF2F2; color: #EF4444; border-color: #FECACA; }
 
-/* TOP NAVBAR */
-.top-navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 70px;
-  background: #1a252f;
-  color: white;
-  z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
+.main-content { padding-top: 120px; padding-bottom: 60px; max-width: 1400px; margin: 0 auto; padding-left: 40px; padding-right: 40px; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+h1 { font-size: 2rem; font-weight: 800; color: var(--text-main); margin: 0; letter-spacing: -1px; }
+.subtitle { color: var(--text-body); margin-top: 6px; }
+.date-pill { background: white; border: 1px solid var(--border); padding: 10px 20px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; }
 
-.nav-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 100%;
-  padding: 0 30px;
-}
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 40px; }
+.kpi-card { background: white; padding: 30px; border-radius: 24px; display: flex; align-items: center; gap: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: pointer; transition: 0.3s var(--ease-spring); }
+.kpi-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--primary-light); }
+.icon-wrapper { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; }
+.income { background: #ECFDF5; border: 1px solid #D1FAE5; }
+.expense { background: #FEF2F2; border: 1px solid #FEE2E2; }
+.project { background: #FFF7ED; border: 1px solid #FFEDD5; }
+.kpi-label { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display: block; }
+.kpi-value { font-size: 1.75rem; font-weight: 800; color: var(--text-main); line-height: 1; }
+.kpi-value.link { color: var(--primary); text-decoration: underline; font-size: 1.5rem; }
 
-.brand-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.charts-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+.chart-card { background: white; padding: 30px; border-radius: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.chart-header h3 { margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--text-main); }
+.chart-header span { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
 
-.logo-icon {
-  background: var(--primary-color);
-  width: 35px;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  border-radius: 6px;
-  font-size: 1.2rem;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 
-.logo-main {
-  display: block;
-  font-weight: 800;
-  letter-spacing: 2px;
-  font-size: 1.1rem;
-}
-
-.logo-sub {
-  font-size: 0.6rem;
-  letter-spacing: 3px;
-  color: #94a3b8;
-  font-weight: bold;
-}
-
-.nav-menu {
-  display: flex;
-  list-style: none;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-menu li {
-  padding: 8px 20px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  color: #cbd5e1;
-  border-radius: 8px;
-  transition: 0.2s;
-  font-weight: 500;
-}
-
-.nav-menu li:hover, .nav-menu li.active {
-  background: rgba(255,255,255,0.1);
-  color: white;
-}
-
-.nav-menu li.active {
-  color: var(--primary-color);
-}
-
-.user-actions {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-right: 20px;
-  border-right: 1px solid rgba(255,255,255,0.1);
-}
-
-.avatar {
-  width: 35px;
-  height: 35px;
-  background: #34495e;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: var(--primary-color);
-  border: 2px solid rgba(255,255,255,0.1);
-}
-
-.user-info { display: flex; flex-direction: column; }
-.u-name { font-size: 0.85rem; font-weight: 600; }
-.u-role { font-size: 0.7rem; color: #94a3b8; }
-
-.logout-pill {
-  background: transparent;
-  border: 1px solid #475569;
-  color: white;
-  padding: 6px 15px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.logout-pill:hover {
-  background: #e74c3c;
-  border-color: #e74c3c;
-}
-
-/* MAIN CONTENT */
-.main-stage {
-  padding-top: 100px;
-  padding-bottom: 50px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding-left: 30px;
-  padding-right: 30px;
-}
-
-.content-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 40px;
-}
-
-.welcome-msg h1 { font-size: 2rem; margin: 0; color: #1e293b; font-weight: 800; }
-.welcome-msg p { color: #64748b; margin: 5px 0 0; }
-.date-display { font-size: 0.9rem; color: #94a3b8; font-weight: 500; }
-
-/* GRID & CARDS */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
-  gap: 25px;
-  margin-bottom: 30px;
-}
-
-.glass-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  border: 1px solid #edf2f7;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.glass-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.card-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #94a3b8;
-  font-weight: 700;
-  margin-bottom: 20px;
-}
-
-/* FINANCE CARD SPECIFIC */
-.finance-card { cursor: pointer; border-left: 5px solid var(--primary-color); }
-.stat-flex { display: flex; align-items: center; justify-content: space-around; margin-top: 10px; }
-.stat-group { display: flex; flex-direction: column; }
-.stat-group small { font-size: 0.7rem; color: #64748b; margin-bottom: 5px; }
-.stat-group .val { font-size: 1.4rem; font-weight: 800; }
-.positive { color: #10b981; }
-.negative { color: #ef4444; }
-.divider { width: 1px; height: 40px; background: #e2e8f0; }
-
-/* INFO CARDS */
-.big-num { font-size: 3rem; font-weight: 800; color: #1e293b; line-height: 1; margin-bottom: 15px; }
-.progress-bar { width: 100%; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-.progress-bar .fill { height: 100%; background: var(--primary-color); }
-.status-note { font-size: 0.85rem; color: #64748b; margin-top: 10px; }
-
-.alert-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #fff5f5;
-  padding: 12px;
-  border-radius: 10px;
-  color: #c53030;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.alert-icon {
-  background: #feb2b2;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-weight: bold;
-}
-
-.card-footer {
-  margin-top: 20px;
-  padding-top: 15px;
-  border-top: 1px solid #f1f5f9;
-  font-size: 0.8rem;
-  color: var(--primary-color);
-  font-weight: 600;
-}
-
-/* TABLE SECTION */
-.recent-activity-section { margin-top: 10px; }
-.mock-table { margin-top: 15px; }
-.t-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; }
-.t-row.header { color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; }
-.t-row.empty { padding: 40px; text-align: center; color: #94a3b8; border: none; font-style: italic; }
-
-@media (max-width: 1024px) {
-  .dashboard-grid { grid-template-columns: 1fr; }
-  .nav-menu { display: none; } /* Mobile optimization needed later */
-}
+@media (max-width: 1024px) { .charts-grid { grid-template-columns: 1fr; } .main-content { padding: 100px 20px 40px; } }
 </style>

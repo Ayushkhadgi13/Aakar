@@ -3,13 +3,13 @@
     <!-- PAGE HEADER -->
     <header class="page-header">
       <div class="header-left">
-        <h1>Construction Projects</h1>
-        <p>Manage site progress, clients, and timelines</p>
+        <h1>Projects</h1>
+        <p>Active construction sites and timelines.</p>
       </div>
       <div class="header-right">
         <div class="search-box">
-          <i class="icon-search"></i>
-          <input type="text" v-model="searchQuery" @input="fetchProjects" placeholder="Search project or client..." />
+          <i class="icon-search">🔍</i>
+          <input type="text" v-model="searchQuery" @input="fetchProjects" placeholder="Search projects..." />
         </div>
         <button @click="showModal = true" class="btn primary">+ New Project</button>
       </div>
@@ -18,23 +18,21 @@
     <!-- PROJECT GRID -->
     <div v-if="loading" class="loader-container">
         <div class="spinner"></div>
-        <p>Loading projects...</p>
     </div>
     
     <div v-else class="project-grid">
-      <!-- Added @click to navigate -->
       <div v-for="project in projects" :key="project.id" class="project-card" @click="goToDetails(project.id)">
         <div class="card-top">
           <span :class="['status-badge', project.status.toLowerCase().replace(' ', '-')]">
             {{ project.status }}
           </span>
-          <div class="card-options">•••</div>
+          <div class="card-dots">•••</div>
         </div>
 
         <div class="card-content">
           <h3>{{ project.name }}</h3>
           <p class="client-name">Client: {{ project.client_name }}</p>
-          <div class="location-tag">📍 {{ project.location || 'Location Not Set' }}</div>
+          <div class="location-tag">📍 {{ project.location || 'N/A' }}</div>
         </div>
 
         <div class="progress-section">
@@ -62,7 +60,7 @@
       <!-- EMPTY STATE -->
       <div v-if="projects.length === 0" class="empty-state">
         <div class="empty-icon">🏗️</div>
-        <p>No projects found. Create one to start tracking.</p>
+        <p>No projects found.</p>
       </div>
     </div>
 
@@ -70,7 +68,7 @@
     <div v-if="showModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>Register New Project</h3>
+          <h3>New Project</h3>
           <button @click="closeModal" class="close-btn">×</button>
         </div>
         <form @submit.prevent="saveProject">
@@ -108,13 +106,12 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Initial Progress (%)</label>
-            <input type="range" v-model.number="form.progress" min="0" max="100" />
-            <div class="range-val">{{ form.progress }}%</div>
+            <label>Initial Progress: {{ form.progress }}%</label>
+            <input type="range" v-model.number="form.progress" min="0" max="100" class="range-slider" />
           </div>
           <div class="modal-footer">
             <button type="submit" class="btn-save full-width" :disabled="isSaving">
-                {{ isSaving ? 'Saving...' : 'Launch Project' }}
+                {{ isSaving ? 'Saving...' : 'Create Project' }}
             </button>
           </div>
         </form>
@@ -171,13 +168,7 @@ const saveProject = async () => {
     closeModal();
     fetchProjects();
   } catch (e) {
-    if (e.response && e.response.status === 422) {
-        const errors = e.response.data.errors;
-        const firstError = Object.values(errors)[0][0];
-        alert("Validation Error: " + firstError);
-    } else {
-        alert("Server Error: Make sure you ran 'php artisan migrate'");
-    }
+    alert("Error saving project. Ensure all fields are valid.");
   } finally {
     isSaving.value = false;
   }
@@ -197,81 +188,97 @@ onMounted(fetchProjects);
 </script>
 
 <style scoped>
-.projects-page { padding: 40px; background: #f8fafc; min-height: 100vh; font-family: 'Inter', sans-serif; }
+.projects-page { animation: fadeIn 0.4s ease-out; }
 
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-.page-header h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin: 0; }
-.page-header p { color: #64748b; margin-top: 5px; }
+/* HEADER */
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.page-header h1 { font-size: 2rem; font-weight: 800; color: var(--text-main); margin: 0; }
+.page-header p { color: var(--text-secondary); margin-top: 5px; }
 
 .header-right { display: flex; gap: 15px; }
 
+/* SEARCH BOX */
 .search-box {
   background: white;
-  border: 1.5px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   display: flex;
   align-items: center;
   padding: 0 15px;
   width: 300px;
+  transition: 0.2s;
 }
-.search-box input { border: none; padding: 12px; outline: none; width: 100%; font-size: 14px; }
+.search-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(166, 93, 67, 0.1); }
+.search-box input { border: none; padding: 12px; outline: none; width: 100%; font-size: 0.95rem; color: var(--text-main); }
+.icon-search { margin-right: 8px; filter: grayscale(1); opacity: 0.5; }
 
-/* PROJECT GRID */
-.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; }
+/* GRID */
+.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 25px; }
 
 .project-card {
   background: white;
   border-radius: 20px;
-  padding: 24px;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
-  transition: 0.3s;
-  cursor: pointer; /* Clickable cursor */
+  padding: 25px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s var(--ease-spring);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
 }
-.project-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08); border-color: #A65D43; }
+.project-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
 
 .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.status-badge { padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
-.upcoming { background: #eff6ff; color: #3b82f6; }
-.in-progress { background: #fff7ed; color: #f59e0b; }
-.on-hold { background: #fef2f2; color: #ef4444; }
-.completed { background: #ecfdf5; color: #10b981; }
+.status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+/* Badge Colors */
+.upcoming { background: #F3F4F6; color: #4B5563; }
+.in-progress { background: var(--warning-bg); color: var(--warning-text); }
+.on-hold { background: var(--danger-bg); color: var(--danger-text); }
+.completed { background: var(--success-bg); color: var(--success-text); }
 
-.card-content h3 { font-size: 18px; margin: 0; color: #1e293b; font-weight: 700; }
-.client-name { font-size: 13px; color: #64748b; margin: 5px 0; }
-.location-tag { font-size: 12px; color: #94a3b8; margin-top: 10px; }
+.card-content h3 { font-size: 1.25rem; margin: 0; color: var(--text-main); font-weight: 700; line-height: 1.3; }
+.client-name { font-size: 0.9rem; color: var(--text-secondary); margin: 5px 0 15px; }
+.location-tag { font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; background: #F9FAFB; padding: 6px 10px; border-radius: 8px; width: fit-content; font-weight: 500;}
 
-.progress-section { margin: 20px 0; }
-.progress-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
-.progress-bar-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 10px; overflow: hidden; }
-.progress-fill { height: 100%; transition: 0.5s; }
+/* PROGRESS */
+.progress-section { margin: 25px 0; }
+.progress-info { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; color: var(--text-main); }
+.progress-bar-bg { width: 100%; height: 8px; background: #E5E7EB; border-radius: 10px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 10px; transition: width 0.8s ease-in-out; }
 
-.card-footer { display: flex; justify-content: space-between; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 15px; }
-.footer-item small { font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
-.footer-item p { font-size: 13px; font-weight: 700; color: #1e293b; margin: 2px 0 0; }
+.card-footer { display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 5px; }
+.footer-item small { font-size: 0.7rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; }
+.footer-item p { font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin: 0; }
 
 /* MODAL */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-.modal-card { background: white; width: 500px; padding: 35px; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: fadeIn 0.2s; }
+.modal-card { background: white; width: 500px; padding: 40px; border-radius: 24px; box-shadow: var(--shadow-lg); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.modal-header h3 { font-size: 1.5rem; font-weight: 800; margin: 0; }
+.close-btn { background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer; }
+
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-.form-group { margin-bottom: 15px; text-align: left; }
-.form-group label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #475569; }
-input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 14px; box-sizing: border-box;}
-input:focus { border-color: #A65D43; outline: none; }
-.range-val { text-align: right; font-weight: 800; color: #A65D43; font-size: 14px; margin-top: 5px; }
+.form-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px; display: block; }
+input, select { width: 100%; padding: 12px 15px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 0.95rem; margin-bottom: 20px; transition: 0.2s; background: #F9FAFB; box-sizing: border-box; }
+input:focus, select:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(166, 93, 67, 0.1); outline: none; }
+.range-slider { padding: 0; }
 
-.btn { padding: 12px 25px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; }
-.primary { background: #A65D43; color: white; }
-.btn-save { background: #0f172a; color: white; border: none; padding: 15px; border-radius: 14px; font-weight: 700; cursor: pointer; }
-.btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
-.full-width { width: 100%; margin-top: 10px; }
-.close-btn { background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; }
+.btn { padding: 12px 24px; border-radius: 12px; font-weight: 700; border: none; cursor: pointer; transition: 0.2s; font-size: 0.95rem; }
+.primary { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(166, 93, 67, 0.3); }
+.primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn-save { background: var(--text-main); color: white; width: 100%; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; border: none; }
+.btn-save:hover { background: black; }
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.loader-container { text-align: center; padding: 100px; color: #64748b; }
-.spinner { border: 4px solid #f3f3f3; border-top: 4px solid #A65D43; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+/* SPINNER & EMPTY STATE */
+.loader-container { padding: 100px; display: flex; justify-content: center; }
+.spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 100px; background: white; border-radius: 30px; border: 2px dashed #e2e8f0; }
-.empty-icon { font-size: 50px; margin-bottom: 15px; }
+.empty-state { grid-column: 1 / -1; text-align: center; padding: 100px; background: white; border-radius: 20px; border: 2px dashed var(--border-color); }
+.empty-icon { font-size: 3rem; margin-bottom: 10px; }
+
+/* ANIMATIONS */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>
