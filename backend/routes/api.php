@@ -17,15 +17,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Finance Module Routes
     Route::get('/finance/summary', [FinanceController::class, 'getSummary']);
-    Route::get('/finance/reports', [FinanceController::class, 'getMonthlyReports']);
-    Route::get('/finance/transactions', [FinanceController::class, 'getTransactions']);
-    Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
     Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
+    
+    // HR / Employee Routes
+    Route::get('/finance/employees', [FinanceController::class, 'getEmployees']);
+    Route::post('/finance/employees', [FinanceController::class, 'storeEmployee']);
+    Route::post('/finance/employees/{id}/pay', [FinanceController::class, 'paySalary']);
+
+    Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
 
     // Project Module Routes
     Route::get('/projects', [ProjectController::class, 'index']);
     Route::post('/projects', [ProjectController::class, 'store']);
-    Route::get('/projects/{id}', [ProjectController::class, 'show']); // New: Get Details
-    Route::post('/projects/{id}/updates', [ProjectController::class, 'addUpdate']); // New: Add Log
+    Route::get('/projects/{id}', [ProjectController::class, 'show']);
+    Route::post('/projects/{id}/updates', [ProjectController::class, 'addUpdate']);
 });
