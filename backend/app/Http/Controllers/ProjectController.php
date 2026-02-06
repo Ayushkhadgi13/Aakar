@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Project;
 use App\Models\ProjectUpdate;
+use App\Models\ProjectDocument; // Import this
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -25,35 +26,48 @@ class ProjectController extends Controller {
         return response()->json($query->orderBy('created_at', 'desc')->get());
     }
 
-    // New: Get Single Project with Updates
+    // Updated: Include Documents in response
     public function show($id) {
-        $project = Project::with(['updates.user'])->findOrFail($id);
+        $project = Project::with(['updates.user', 'documents'])->findOrFail($id);
         return response()->json($project);
     }
 
-    // New: Update Project Details (Progress, Status, etc.)
+    // New: Upload Document
+    public function uploadDocument(Request $request, $id) {
+        $request->validate([
+            'file' => 'required|file|max:20480', // Max 20MB
+            'type' => 'required|string|in:BOQ,Drawing,Pre-Estimation,Other'
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('project_docs', 'public');
+
+        $doc = ProjectDocument::create([
+            'project_id' => $id,
+            'file_type' => $request->type,
+            'original_name' => $file->getClientOriginalName(),
+            'file_path' => '/storage/' . $path
+        ]);
+
+        return response()->json($doc);
+    }
+
     public function update(Request $request, $id) {
         $project = Project::findOrFail($id);
-
         $validated = $request->validate([
             'progress' => 'sometimes|integer|min:0|max:100',
             'status' => 'sometimes|in:Upcoming,In Progress,On Hold,Completed',
-            // Add other fields here if you want them editable later
         ]);
-
         $project->update($validated);
-
         return response()->json($project);
     }
 
-    // New: Add Update (Text + Photo)
     public function addUpdate(Request $request, $id) {
         $request->validate([
             'message' => 'nullable|string',
-            'image' => 'nullable|image|max:5120' // Max 5MB
+            'image' => 'nullable|image|max:5120'
         ]);
 
-        // Ensure at least one is present
         if (!$request->message && !$request->hasFile('image')) {
             return response()->json(['message' => 'Please provide text or an image'], 422);
         }
@@ -89,13 +103,7 @@ class ProjectController extends Controller {
             $project = Project::create($data);
             return response()->json($project, 201);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Failed',
-                'errors' => $e->errors()
-            ], 422);
         } catch (\Exception $e) {
-            Log::error("Project Store Error: " . $e->getMessage());
             return response()->json([
                 'message' => 'Internal Server Error.',
                 'error' => $e->getMessage()

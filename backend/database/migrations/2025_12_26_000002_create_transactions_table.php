@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->enum('type', ['income', 'expense']);
+            // UPDATE THIS LINE: Added 'pre-payment' to the list
+            $table->enum('type', ['income', 'expense', 'pre-payment']); 
             $table->decimal('amount', 15, 2);
             $table->string('category');
             $table->date('date');

@@ -10,8 +10,12 @@ class Project extends Model {
         'status', 'start_date', 'end_date', 'progress'
     ];
 
-    // Add relationship
     public function updates() {
         return $this->hasMany(ProjectUpdate::class)->orderBy('created_at', 'asc');
+    }
+
+    // New Relationship
+    public function documents() {
+        return $this->hasMany(ProjectDocument::class)->orderBy('created_at', 'desc');
     }
 }
