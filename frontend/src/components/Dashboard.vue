@@ -12,18 +12,22 @@
           <button @click="router.push('/dashboard')" :class="['nav-item', { active: $route.path === '/dashboard' }]">Overview</button>
           <button @click="router.push('/finance')" :class="['nav-item', { active: $route.path === '/finance' }]">Finance</button>
           <button @click="router.push('/projects')" :class="['nav-item', { active: $route.path === '/projects' }]">Projects</button>
-          <button class="nav-item disabled">Inventory</button>
+          <!-- NEW TASK LINK -->
+          <button @click="router.push('/tasks')" :class="['nav-item', { active: $route.path === '/tasks' }]">Tasks</button>
         </div>
 
         <div class="user-actions">
+          <button @click="toggleTheme" class="theme-btn" :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+            <span v-if="isDark">☀️</span>
+            <span v-else>🌙</span>
+          </button>
+
           <div class="profile-info">
             <span class="user-name">{{ user?.name || 'Admin' }}</span>
-            <span class="user-role">Administrator</span>
+            <span class="user-role">{{ user?.role?.toUpperCase() }}</span>
           </div>
           <div class="avatar">{{ user?.name?.charAt(0) || 'A' }}</div>
-          <button @click="logout" class="logout-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-          </button>
+          <button @click="logout" class="logout-btn"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
         </div>
       </div>
     </nav>
@@ -34,6 +38,7 @@
         <transition name="fade" mode="out-in"><component :is="Component" /></transition>
       </router-view>
       
+      <!-- DASHBOARD WIDGETS (Only visible on /dashboard root) -->
       <div v-if="$route.path === '/dashboard'" class="overview-container">
         <header class="page-header">
           <div class="header-text">
@@ -75,7 +80,6 @@
               <h3>Financial Trend</h3>
               <span>Last 6 Months</span>
             </div>
-            <!-- APEX CHART COMPONENT -->
             <apexchart 
               type="area" 
               height="300" 
@@ -103,51 +107,88 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
-// Import the chart component
 import apexchart from "vue3-apexcharts";
 
 const router = useRouter();
 const user = ref(null);
 const summary = ref(null);
 const projects = ref([]);
+const isDark = ref(localStorage.getItem('theme') === 'dark');
 
 const projectCount = computed(() => projects.value.length);
 
-// Finance Chart Configuration
+const applyTheme = () => {
+  if (isDark.value) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'light');
+  }
+};
+
+const toggleTheme = () => {
+  isDark.value = !isDark.value;
+  applyTheme();
+  updateChartTheme();
+};
+
 const financeSeries = computed(() => [
   { name: 'Income', data: summary.value?.monthly_stats?.map(s => s.income) || [0,0,0,0,0,0] },
   { name: 'Expense', data: summary.value?.monthly_stats?.map(s => s.expense) || [0,0,0,0,0,0] }
 ]);
 
-const financeChartOptions = {
-  chart: { toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
+const financeChartOptions = ref({
+  chart: { toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans', background: 'transparent' },
   colors: ['#10B981', '#EF4444'],
   dataLabels: { enabled: false },
   stroke: { curve: 'smooth', width: 3 },
   fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0 } },
-  xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], axisBorder: { show: false } },
-  grid: { borderColor: '#f1f5f9' }
-};
+  xaxis: { 
+    categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], 
+    axisBorder: { show: false },
+    labels: { style: { colors: isDark.value ? '#94A3B8' : '#64748B' } }
+  },
+  yaxis: { labels: { style: { colors: isDark.value ? '#94A3B8' : '#64748B' } } },
+  grid: { borderColor: isDark.value ? '#334155' : '#f1f5f9' },
+  theme: { mode: isDark.value ? 'dark' : 'light' }
+});
 
-// Project Status Configuration
 const statusSeries = computed(() => {
   const counts = { 'In Progress': 0, 'Upcoming': 0, 'Completed': 0, 'On Hold': 0 };
-  projects.value.forEach(p => {
-    if(counts[p.status] !== undefined) counts[p.status]++;
-  });
+  projects.value.forEach(p => counts[p.status]++);
   return Object.values(counts);
 });
 
-const statusChartOptions = {
+const statusChartOptions = ref({
   labels: ['In Progress', 'Upcoming', 'Completed', 'On Hold'],
   colors: ['#A65D43', '#94A3B8', '#10B981', '#F59E0B'],
-  chart: { fontFamily: 'Plus Jakarta Sans' },
-  legend: { position: 'bottom' },
+  chart: { fontFamily: 'Plus Jakarta Sans', background: 'transparent' },
+  legend: { position: 'bottom', labels: { colors: isDark.value ? '#94A3B8' : '#64748B' } },
   dataLabels: { enabled: false },
+  stroke: { show: false },
   plotOptions: { pie: { donut: { size: '75%' } } }
+});
+
+const updateChartTheme = () => {
+  const textColor = isDark.value ? '#94A3B8' : '#64748B';
+  const gridColor = isDark.value ? '#334155' : '#f1f5f9';
+  
+  financeChartOptions.value = {
+    ...financeChartOptions.value,
+    xaxis: { ...financeChartOptions.value.xaxis, labels: { style: { colors: textColor } } },
+    yaxis: { ...financeChartOptions.value.yaxis, labels: { style: { colors: textColor } } },
+    grid: { borderColor: gridColor },
+    theme: { mode: isDark.value ? 'dark' : 'light' }
+  };
+
+  statusChartOptions.value = {
+    ...statusChartOptions.value,
+    legend: { ...statusChartOptions.value.legend, labels: { colors: textColor } }
+  };
 };
 
 const fetchData = async () => {
@@ -171,54 +212,51 @@ const logout = async () => {
   router.push('/login');
 };
 
-onMounted(fetchData);
+onMounted(() => {
+  applyTheme();
+  updateChartTheme();
+  fetchData();
+});
 </script>
 
 <style scoped>
-.dashboard-wrapper { min-height: 100vh; }
-.top-navbar { position: fixed; top: 0; left: 0; width: 100%; height: 80px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.top-navbar { position: fixed; top: 0; left: 0; width: 100%; height: 80px; background: var(--bg-nav); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; justify-content: center; transition: background 0.3s, border-color 0.3s; }
 .nav-inner { width: 100%; max-width: 1400px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
 .brand-box { display: flex; align-items: center; gap: 12px; }
-.logo-icon { width: 40px; height: 40px; background: var(--primary); color: white; font-weight: 800; display: flex; align-items: center; justify-content: center; border-radius: 10px; box-shadow: 0 4px 10px rgba(166, 93, 67, 0.3); }
+.logo-icon { width: 40px; height: 40px; background: var(--primary); color: white; font-weight: 800; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
 .brand-text { font-weight: 800; font-size: 1.2rem; color: var(--text-main); }
-.nav-links { display: flex; background: #F1F5F9; padding: 5px; border-radius: 12px; gap: 5px; }
-.nav-item { background: transparent; border: none; padding: 8px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: var(--text-body); cursor: pointer; transition: 0.2s; }
-.nav-item:hover { background: rgba(255,255,255,0.5); }
-.nav-item.active { background: white; color: var(--text-main); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.nav-item.disabled { opacity: 0.5; cursor: not-allowed; }
+.nav-links { display: flex; background: var(--bg-input); padding: 5px; border-radius: 12px; gap: 5px; border: 1px solid var(--border); }
+.nav-item { background: transparent; border: none; padding: 8px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: var(--text-body); cursor: pointer; transition: 0.3s; }
+.nav-item.active { background: var(--bg-surface); color: var(--text-main); box-shadow: var(--shadow-sm); }
+.nav-item:hover:not(.active) { color: var(--primary); }
+.nav-item.disabled { opacity: 0.5; }
 .user-actions { display: flex; align-items: center; gap: 16px; }
 .profile-info { text-align: right; }
-.user-name { display: block; font-weight: 700; font-size: 0.9rem; }
+.user-name { display: block; font-weight: 700; font-size: 0.9rem; color: var(--text-main); }
 .user-role { font-size: 0.75rem; color: var(--text-muted); }
-.avatar { width: 42px; height: 42px; background: var(--text-main); color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
-.logout-btn { border: 1px solid var(--border); background: white; color: var(--text-muted); padding: 10px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
-.logout-btn:hover { background: #FEF2F2; color: #EF4444; border-color: #FECACA; }
-
+.avatar { width: 42px; height: 42px; background: var(--text-main); color: var(--bg-surface); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.logout-btn { border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); padding: 10px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+.logout-btn:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-bg); }
+.theme-btn { background: transparent; border: 1px solid var(--border); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2rem; transition: 0.3s; }
+.theme-btn:hover { background: var(--bg-input); }
 .main-content { padding-top: 120px; padding-bottom: 60px; max-width: 1400px; margin: 0 auto; padding-left: 40px; padding-right: 40px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-h1 { font-size: 2rem; font-weight: 800; color: var(--text-main); margin: 0; letter-spacing: -1px; }
-.subtitle { color: var(--text-body); margin-top: 6px; }
-.date-pill { background: white; border: 1px solid var(--border); padding: 10px 20px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; }
-
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 40px; }
-.kpi-card { background: white; padding: 30px; border-radius: 24px; display: flex; align-items: center; gap: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: pointer; transition: 0.3s var(--ease-spring); }
-.kpi-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--primary-light); }
-.icon-wrapper { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; }
-.income { background: #ECFDF5; border: 1px solid #D1FAE5; }
-.expense { background: #FEF2F2; border: 1px solid #FEE2E2; }
-.project { background: #FFF7ED; border: 1px solid #FFEDD5; }
-.kpi-label { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display: block; }
-.kpi-value { font-size: 1.75rem; font-weight: 800; color: var(--text-main); line-height: 1; }
-.kpi-value.link { color: var(--primary); text-decoration: underline; font-size: 1.5rem; }
-
+h1 { font-size: 2rem; font-weight: 800; color: var(--text-main); margin: 0; }
+.header-text p { color: var(--text-secondary); margin-top: 5px; }
+.date-pill { background: var(--bg-surface); border: 1px solid var(--border); padding: 10px 20px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 30px; }
+.kpi-card { background: var(--bg-surface); padding: 25px; border-radius: 24px; display: flex; align-items: center; gap: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: pointer; transition: 0.3s; }
+.kpi-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--primary); }
+.icon-wrapper { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+.income { background: var(--success-bg); color: var(--success-text); }
+.expense { background: var(--danger-bg); color: var(--danger-text); }
+.project { background: var(--warning-bg); color: var(--warning-text); }
+.kpi-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+.kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--text-main); }
 .charts-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
-.chart-card { background: white; padding: 30px; border-radius: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-.chart-header h3 { margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--text-main); }
-.chart-header span { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
-
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-@media (max-width: 1024px) { .charts-grid { grid-template-columns: 1fr; } .main-content { padding: 100px 20px 40px; } }
+.chart-card { background: var(--bg-surface); padding: 30px; border-radius: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.chart-header h3 { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--text-main); }
+.chart-header span { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+@media (max-width: 1024px) { .charts-grid { grid-template-columns: 1fr; } }
 </style>

@@ -4,7 +4,8 @@ import Register from './components/Register.vue'
 import Dashboard from './components/Dashboard.vue'
 import Finance from './components/Finance.vue'
 import Projects from './components/Projects.vue'
-import ProjectDetails from './components/ProjectDetails.vue' // Import this
+import ProjectDetails from './components/ProjectDetails.vue'
+import Tasks from './components/Tasks.vue' // Import Tasks
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -17,7 +18,8 @@ const routes = [
     children: [
       { path: '/finance', component: Finance },
       { path: '/projects', component: Projects },
-      { path: '/projects/:id', component: ProjectDetails } // Dynamic ID route
+      { path: '/projects/:id', component: ProjectDetails },
+      { path: '/tasks', component: Tasks } // New Route
     ]
   }
 ]

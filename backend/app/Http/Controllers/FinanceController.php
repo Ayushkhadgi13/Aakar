@@ -7,7 +7,6 @@ use App\Models\Transaction;
 use App\Models\Vendor;
 use App\Models\Employee;
 use App\Models\VendorMaterial;
-use App\Models\MonthlyReport; 
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -40,7 +39,6 @@ class FinanceController extends Controller {
     }
 
     public function getVendors() {
-        // Load vendor with their materials and the linked project
         return response()->json(Vendor::with(['materials', 'project'])->orderBy('created_at', 'desc')->get());
     }
 
@@ -82,6 +80,11 @@ class FinanceController extends Controller {
     }
 
     public function storeEmployee(Request $request) {
+        // --- ADMIN CHECK ADDED HERE ---
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can add employees.'], 403);
+        }
+
         $data = $request->validate([
             'name' => 'required|string',
             'role' => 'required|string',
@@ -94,7 +97,6 @@ class FinanceController extends Controller {
     public function paySalary(Request $request, $id) {
         $employee = Employee::findOrFail($id);
         
-        // Generate an expense transaction automatically
         $transaction = Transaction::create([
             'type' => 'expense',
             'amount' => $employee->salary_amount,

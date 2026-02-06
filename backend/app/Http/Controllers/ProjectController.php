@@ -31,6 +31,21 @@ class ProjectController extends Controller {
         return response()->json($project);
     }
 
+    // New: Update Project Details (Progress, Status, etc.)
+    public function update(Request $request, $id) {
+        $project = Project::findOrFail($id);
+
+        $validated = $request->validate([
+            'progress' => 'sometimes|integer|min:0|max:100',
+            'status' => 'sometimes|in:Upcoming,In Progress,On Hold,Completed',
+            // Add other fields here if you want them editable later
+        ]);
+
+        $project->update($validated);
+
+        return response()->json($project);
+    }
+
     // New: Add Update (Text + Photo)
     public function addUpdate(Request $request, $id) {
         $request->validate([

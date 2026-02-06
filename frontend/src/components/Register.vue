@@ -104,39 +104,38 @@ const redirectToLogin = () => {
   position: relative;
   height: 100vh;
   width: 100%;
-  /* NEW BACKGROUND: Clean Professional Gray Gradient */
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  /* Gradient background adapted for dark/light via variables if needed, currently keeping static gray gradient for auth */
+  background: linear-gradient(135deg, var(--bg-body) 0%, var(--bg-input) 100%);
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* Removed .overlay class */
-
 .auth-card {
   position: relative;
   z-index: 2;
-  background: white;
+  background: var(--bg-surface);
   padding: 2.5rem;
   border-radius: 12px;
   /* Soft shadow for depth */
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 400px;
   text-align: center;
-  border-top: 5px solid #f39c12;
+  border-top: 5px solid var(--warning-text);
+  border: 1px solid var(--border);
 }
 
 .card-header h1 {
   margin: 0;
-  color: #2c3e50;
+  color: var(--text-main);
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: 2px;
 }
 .card-header p {
   margin: 0;
-  color: #f39c12;
+  color: var(--warning-text);
   font-weight: bold;
   letter-spacing: 4px;
   font-size: 0.9rem;
@@ -144,7 +143,7 @@ const redirectToLogin = () => {
 }
 
 h2 {
-  color: #444;
+  color: var(--text-main);
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
 }
@@ -156,28 +155,30 @@ h2 {
 label {
   display: block;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 0.3rem;
   font-weight: 600;
 }
 input {
   width: 100%;
   padding: 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 1rem;
   box-sizing: border-box;
   transition: border-color 0.3s;
+  background: var(--bg-input);
+  color: var(--text-main);
 }
 input:focus {
   outline: none;
-  border-color: #f39c12;
+  border-color: var(--warning-text);
 }
 
 .btn-primary {
   width: 100%;
   padding: 12px;
-  background-color: #f39c12;
+  background-color: var(--warning-text);
   color: white;
   border: none;
   border-radius: 6px;
@@ -188,15 +189,15 @@ input:focus {
   text-transform: uppercase;
 }
 .btn-primary:hover {
-  background-color: #d35400;
+  opacity: 0.9;
 }
 .btn-primary:disabled {
-  background-color: #95a5a6;
+  background-color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .error-msg {
-  color: red;
+  color: var(--danger-text);
   margin-top: 10px;
   font-size: 0.9rem;
 }
@@ -204,8 +205,9 @@ input:focus {
 .card-footer {
   margin-top: 1.5rem;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
 }
+.card-footer a { color: var(--warning-text); }
 
 /* --- POPUP MODAL STYLES --- */
 .modal-overlay {
@@ -223,20 +225,21 @@ input:focus {
 }
 
 .modal-content {
-  background: white;
+  background: var(--bg-surface);
   padding: 2.5rem;
   border-radius: 15px;
   text-align: center;
   width: 90%;
   max-width: 350px;
-  box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-lg);
   animation: slideUp 0.3s ease;
+  border: 1px solid var(--border);
 }
 
 .icon-circle {
   width: 70px;
   height: 70px;
-  background-color: #27ae60;
+  background-color: var(--success-bg);
   border-radius: 50%;
   display: flex;
   justify-content: center;
@@ -244,21 +247,22 @@ input:focus {
   margin: 0 auto 1.5rem;
   box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
 }
+.icon-circle svg { fill: var(--success-text); }
 
 .modal-content h3 {
   margin: 0;
-  color: #2c3e50;
+  color: var(--text-main);
   font-size: 1.6rem;
   margin-bottom: 0.5rem;
 }
 
 .modal-content p {
-  color: #7f8c8d;
+  color: var(--text-secondary);
   margin-bottom: 2rem;
 }
 
 .btn-modal {
-  background-color: #27ae60;
+  background-color: var(--success-text);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -271,7 +275,7 @@ input:focus {
 }
 
 .btn-modal:hover {
-  background-color: #219150;
+  opacity: 0.9;
 }
 
 @keyframes fadeIn {
