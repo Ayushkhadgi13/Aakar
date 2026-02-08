@@ -82,7 +82,7 @@
       </section>
     </div>
 
-    <!-- VENDOR MODAL (FIXED) -->
+    <!-- VENDOR MODAL -->
     <div v-if="showVendorModal" class="modal-backdrop">
       <div class="modal-card wide">
         <div class="modal-header">
@@ -104,7 +104,6 @@
             </div>
           </div>
 
-          <!-- Added Contact Info Fields to prevent Backend Issues -->
           <div class="form-row">
             <div class="form-group">
               <label>Contact Person</label>
@@ -206,7 +205,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const summary = ref({});
 const vendors = ref([]);
 const employees = ref([]);
@@ -233,6 +234,12 @@ const loadData = async () => {
   try {
     const userRes = await axios.get('/user');
     isAdmin.value = userRes.data.role === 'admin';
+
+    // SECURITY CHECK: Redirect if not admin
+    if (!isAdmin.value) {
+      router.push('/dashboard');
+      return;
+    }
 
     const [sum, vends, emps, projs] = await Promise.all([
       axios.get('/finance/summary'),
@@ -267,7 +274,7 @@ const saveVendor = async () => {
   try {
     await axios.post('/finance/vendors', formV.value);
     showVendorModal.value = false;
-    // Reset Form including optional fields
+    // Reset Form
     formV.value = { 
       name: '', 
       project_id: '', 

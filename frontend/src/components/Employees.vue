@@ -85,7 +85,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const users = ref([]);
 const showModal = ref(false);
 const isSaving = ref(false);
@@ -93,6 +95,13 @@ const form = ref({ name: '', email: '', dob: '', role: 'user', salary: null });
 
 const fetchUsers = async () => {
   try {
+    const userRes = await axios.get('/user');
+    // SECURITY CHECK
+    if (userRes.data.role !== 'admin') {
+      router.push('/dashboard');
+      return;
+    }
+
     const res = await axios.get('/system/employees');
     users.value = res.data.users;
   } catch (e) {

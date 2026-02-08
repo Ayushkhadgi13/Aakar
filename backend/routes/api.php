@@ -6,7 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
-use App\Http\Controllers\EmployeeController; // Import
+use App\Http\Controllers\EmployeeController; 
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -22,14 +22,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
     Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
     
-    // Legacy HR Routes (Keep for compatibility or migrate to EmployeeController)
+    // Legacy HR Routes
     Route::get('/finance/employees', [FinanceController::class, 'getEmployees']);
     Route::post('/finance/employees', [FinanceController::class, 'storeEmployee']);
     Route::post('/finance/employees/{id}/pay', [FinanceController::class, 'paySalary']);
 
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
 
-    // New Dedicated Employee Management Routes
+    // System Employee Management Routes
     Route::get('/system/employees', [EmployeeController::class, 'index']);
     Route::post('/system/employees', [EmployeeController::class, 'store']);
 
@@ -43,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Task Module Routes
     Route::get('/tasks', [TaskController::class, 'index']);
+    Route::get('/tasks/stats', [TaskController::class, 'userStats']); // <--- NEW ROUTE
     Route::get('/users-list', [TaskController::class, 'getUsers']); 
     Route::post('/tasks', [TaskController::class, 'store']);
     Route::put('/tasks/{id}', [TaskController::class, 'update']);

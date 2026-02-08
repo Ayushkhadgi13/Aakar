@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Project; 
 use Illuminate\Support\Facades\Auth;
 
 class TaskController extends Controller
@@ -29,12 +30,27 @@ class TaskController extends Controller
         ]);
     }
 
+    // NEW: User Stats for Employee Dashboard
+    public function userStats(Request $request) {
+        $userId = $request->user()->id;
+
+        return response()->json([
+            'pending_count' => Task::where('assigned_to', $userId)->where('status', 'Pending')->count(),
+            'in_progress_count' => Task::where('assigned_to', $userId)->where('status', 'In Progress')->count(),
+            'completed_count' => Task::where('assigned_to', $userId)->where('status', 'Completed')->count(),
+            'active_projects' => Project::where('status', 'In Progress')->count(),
+            'recent_tasks' => Task::where('assigned_to', $userId)
+                                  ->where('status', '!=', 'Completed')
+                                  ->orderBy('due_date', 'asc')
+                                  ->take(5)
+                                  ->get()
+        ]);
+    }
+
     // Get list of users for dropdown (Admin only)
     public function getUsers(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        // Allow all users to see the list for tagging, or restrict to admin if preferred
         return response()->json(User::select('id', 'name', 'email', 'role')->get());
     }
 
