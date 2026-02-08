@@ -6,8 +6,8 @@
         <p>Manage project procurement and employee salaries.</p>
       </div>
       <div class="header-right">
-        <!-- ONLY ADMIN CAN ADD EMPLOYEES -->
-        <button v-if="isAdmin" @click="showEmployeeModal = true" class="btn secondary">Add Employee</button>
+        <!-- Shortcuts -->
+        <button v-if="isAdmin" @click="showEmployeeModal = true" class="btn secondary">Add Staff</button>
         <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
         <button @click="showTransactionModal = true" class="btn primary">+ Transaction</button>
       </div>
@@ -17,15 +17,15 @@
     <section class="stats-container" v-if="summary">
       <div class="stat-box">
         <label>Total Balance</label>
-        <div class="value">Rs. {{ summary.total_balance.toLocaleString() }}</div>
+        <div class="value">Rs. {{ summary.total_balance?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
         <label>Monthly Revenue</label>
-        <div class="value positive">Rs. {{ summary.total_income.toLocaleString() }}</div>
+        <div class="value positive">Rs. {{ summary.total_income?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
         <label>Monthly Expenses</label>
-        <div class="value negative">Rs. {{ summary.total_expense.toLocaleString() }}</div>
+        <div class="value negative">Rs. {{ summary.total_expense?.toLocaleString() || 0 }}</div>
       </div>
     </section>
 
@@ -46,10 +46,13 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="employees.length === 0">
+              <td colspan="4" style="text-align:center; color: var(--text-muted);">No employees found.</td>
+            </tr>
             <tr v-for="emp in employees" :key="emp.id">
               <td><strong>{{ emp.name }}</strong></td>
               <td>{{ emp.role }}</td>
-              <td>Rs. {{ emp.salary_amount.toLocaleString() }}</td>
+              <td>Rs. {{ Number(emp.salary_amount).toLocaleString() }}</td>
               <td>
                 <button @click="processSalary(emp)" class="pay-btn">Pay Salary</button>
               </td>
@@ -64,10 +67,14 @@
           <h2>Vendor Directory</h2>
         </div>
         <div class="vendor-list">
+          <div v-if="vendors.length === 0" style="text-align:center; color: var(--text-muted); padding: 20px;">
+            No vendors registered.
+          </div>
           <div v-for="vendor in vendors" :key="vendor.id" class="vendor-item">
             <div class="v-info">
               <h3>{{ vendor.name }}</h3>
               <span class="p-link">Project: {{ vendor.project?.name || 'Unlinked' }}</span>
+              <div class="v-meta" v-if="vendor.contact_person">Contact: {{ vendor.contact_person }}</div>
             </div>
             <div class="v-amount">Rs. {{ calculateVendorTotal(vendor.materials).toLocaleString() }}</div>
           </div>
@@ -75,7 +82,7 @@
       </section>
     </div>
 
-    <!-- VENDOR MODAL -->
+    <!-- VENDOR MODAL (FIXED) -->
     <div v-if="showVendorModal" class="modal-backdrop">
       <div class="modal-card wide">
         <div class="modal-header">
@@ -96,28 +103,42 @@
               </select>
             </div>
           </div>
+
+          <!-- Added Contact Info Fields to prevent Backend Issues -->
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact Person</label>
+              <input type="text" v-model="formV.contact_person" placeholder="Manager Name" />
+            </div>
+            <div class="form-group">
+              <label>Phone Number</label>
+              <input type="text" v-model="formV.phone" placeholder="98XXXXXXXX" />
+            </div>
+          </div>
           
           <div class="material-builder">
             <label>Materials</label>
             <div v-for="(mat, idx) in formV.materials" :key="idx" class="builder-row">
-              <input type="text" v-model="mat.material_name" placeholder="Item" required />
-              <input type="number" v-model="mat.unit_price" placeholder="Price" required />
-              <input type="number" v-model="mat.quantity" placeholder="Qty" required />
-              <button type="button" @click="formV.materials.splice(idx,1)" class="del-row">×</button>
+              <input type="text" v-model="mat.material_name" placeholder="Item Name" required />
+              <input type="number" v-model="mat.unit_price" placeholder="Price/Unit" required min="0" />
+              <input type="number" v-model="mat.quantity" placeholder="Qty" required min="1" />
+              <button type="button" @click="removeMaterial(idx)" class="del-row">×</button>
             </div>
-            <button type="button" @click="formV.materials.push({material_name:'', unit_price:0, quantity:1})" class="add-row">+ Add Item</button>
+            <button type="button" @click="addMaterial" class="add-row">+ Add Item</button>
           </div>
 
-          <button type="submit" class="btn-save">Register Vendor</button>
+          <button type="submit" class="btn-save" :disabled="isSaving">
+            {{ isSaving ? 'Saving...' : 'Register Vendor' }}
+          </button>
         </form>
       </div>
     </div>
 
-    <!-- EMPLOYEE MODAL (Only if Admin) -->
+    <!-- EMPLOYEE MODAL (Simple Payroll Entry) -->
     <div v-if="showEmployeeModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>Add Employee</h3>
+          <h3>Add Payroll Staff</h3>
           <button @click="showEmployeeModal = false" class="close-btn">×</button>
         </div>
         <form @submit.prevent="saveEmployee">
@@ -137,12 +158,12 @@
             <label>Join Date</label>
             <input type="date" v-model="formE.join_date" required />
           </div>
-          <button type="submit" class="btn-save full-width">Add to Staff</button>
+          <button type="submit" class="btn-save full-width">Add to Payroll</button>
         </form>
       </div>
     </div>
 
-    <!-- TRANSACTION MODAL (ADDED MISSING MODAL) -->
+    <!-- TRANSACTION MODAL -->
     <div v-if="showTransactionModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
@@ -186,7 +207,7 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
-const summary = ref(null);
+const summary = ref({});
 const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
@@ -194,9 +215,18 @@ const showVendorModal = ref(false);
 const showEmployeeModal = ref(false);
 const showTransactionModal = ref(false);
 const isAdmin = ref(false);
+const isSaving = ref(false);
 
-const formV = ref({ name: '', project_id: '', materials: [{ material_name: '', unit_price: 0, quantity: 1 }] });
-const formE = ref({ name: '', role: '', salary_amount: 0, join_date: '' });
+// Forms
+const formV = ref({ 
+  name: '', 
+  project_id: '', 
+  contact_person: '', 
+  phone: '', 
+  materials: [{ material_name: '', unit_price: '', quantity: '' }] 
+});
+
+const formE = ref({ name: '', role: '', salary_amount: '', join_date: '' });
 const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' });
 
 const loadData = async () => {
@@ -219,11 +249,46 @@ const loadData = async () => {
   }
 };
 
+// Vendor Logic
+const addMaterial = () => {
+  formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' });
+};
+
+const removeMaterial = (idx) => {
+  if (formV.value.materials.length > 1) {
+    formV.value.materials.splice(idx, 1);
+  } else {
+    alert("At least one material is required.");
+  }
+};
+
+const saveVendor = async () => {
+  isSaving.value = true;
+  try {
+    await axios.post('/finance/vendors', formV.value);
+    showVendorModal.value = false;
+    // Reset Form including optional fields
+    formV.value = { 
+      name: '', 
+      project_id: '', 
+      contact_person: '', 
+      phone: '', 
+      materials: [{ material_name: '', unit_price: '', quantity: '' }] 
+    };
+    loadData();
+  } catch (e) {
+    alert("Failed to save vendor. Please check all fields.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+// Employee Logic
 const saveEmployee = async () => {
   try {
     await axios.post('/finance/employees', formE.value);
     showEmployeeModal.value = false;
-    formE.value = { name: '', role: '', salary_amount: 0, join_date: '' };
+    formE.value = { name: '', role: '', salary_amount: '', join_date: '' };
     loadData();
   } catch(e) {
     alert("Operation failed. Ensure you are an admin.");
@@ -238,32 +303,25 @@ const processSalary = async (emp) => {
   }
 };
 
-const saveVendor = async () => {
-  await axios.post('/finance/vendors', formV.value);
-  showVendorModal.value = false;
-  formV.value = { name: '', project_id: '', materials: [{ material_name: '', unit_price: 0, quantity: 1 }] };
-  loadData();
-};
-
+// Transaction Logic
 const saveTransaction = async () => {
   try {
     await axios.post('/finance/transactions', formT.value);
     showTransactionModal.value = false;
-    // Reset form
     formT.value = { type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' };
-    loadData(); // Refresh summary stats
+    loadData();
   } catch (e) {
     alert("Failed to save transaction.");
   }
 };
 
-const calculateVendorTotal = (mats) => mats?.reduce((acc, m) => acc + parseFloat(m.total_price), 0) || 0;
+const calculateVendorTotal = (mats) => mats?.reduce((acc, m) => acc + parseFloat(m.total_price || 0), 0) || 0;
 
 onMounted(loadData);
 </script>
 
 <style scoped>
-.finance-page { padding: 40px; }
+.finance-page { padding: 40px; animation: fadeIn 0.4s ease-out; }
 .finance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
 .header-right { display: flex; gap: 10px; }
 h1 { color: var(--text-main); font-size: 2rem; font-weight: 800; margin: 0; }
@@ -289,19 +347,22 @@ p { color: var(--text-secondary); margin-top: 5px; }
 .data-table th { text-align: left; font-size: 12px; color: var(--text-secondary); padding-bottom: 15px; }
 .data-table td { padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-body); }
 .data-table strong { color: var(--text-main); }
-.pay-btn { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12px; }
+.pay-btn { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12px; transition: 0.2s; }
+.pay-btn:hover { opacity: 0.9; }
 
 /* VENDORS */
-.vendor-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-top: 1px solid var(--border); }
+.vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 0; border-top: 1px solid var(--border); }
 .v-info h3 { margin: 0; font-size: 15px; color: var(--text-main); }
-.p-link { font-size: 12px; color: var(--primary); font-weight: 700; }
+.p-link { font-size: 12px; color: var(--primary); font-weight: 700; display: block; margin-top: 2px; }
+.v-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .v-amount { font-weight: 800; color: var(--text-main); }
 
 /* MODALS */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-.modal-card { background: var(--bg-surface); padding: 35px; border-radius: 24px; width: 450px; border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
+.modal-card { background: var(--bg-surface); padding: 35px; border-radius: 24px; width: 450px; border: 1px solid var(--border); box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto; }
 .wide { width: 700px; }
 .modal-header h3 { color: var(--text-main); margin: 0; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .form-group { margin-bottom: 15px; }
 .form-group label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text-secondary); }
 input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); box-sizing: border-box; background: var(--bg-input); color: var(--text-main); font-family: inherit; }
@@ -311,7 +372,8 @@ input:focus, select:focus { border-color: var(--primary); outline: none; }
 .material-builder label { color: var(--text-main); font-weight: 700; margin-bottom: 10px; display: block; }
 .builder-row { display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 10px; margin-bottom: 10px; }
 .del-row { background: var(--danger-bg); color: var(--danger-text); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-.add-row { background: none; border: 1px dashed var(--primary); color: var(--primary); padding: 8px; width: 100%; border-radius: 10px; cursor: pointer; font-weight: 700; }
+.add-row { background: none; border: 1px dashed var(--primary); color: var(--primary); padding: 8px; width: 100%; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.2s; }
+.add-row:hover { background: var(--bg-surface); }
 
 .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
 .primary { background: var(--primary); color: white; }
@@ -320,4 +382,7 @@ input:focus, select:focus { border-color: var(--primary); outline: none; }
 .btn-save { background: var(--text-main); color: var(--bg-surface); padding: 15px; width: 100%; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; margin-top: 10px; }
 .full-width { width: 100%; }
 .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 1024px) { .finance-grid { grid-template-columns: 1fr; } .stats-container { grid-template-columns: 1fr; } }
 </style>

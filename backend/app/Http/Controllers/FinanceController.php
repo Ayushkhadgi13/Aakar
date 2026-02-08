@@ -43,6 +43,7 @@ class FinanceController extends Controller {
     }
 
     public function storeVendor(Request $request) {
+        // Validation
         $data = $request->validate([
             'name' => 'required|string',
             'project_id' => 'required|exists:projects,id',
@@ -54,11 +55,12 @@ class FinanceController extends Controller {
             'materials.*.quantity' => 'required|numeric|min:1',
         ]);
 
+        // Fix: Use data_get or request input to avoid "Undefined array key" error
         $vendor = Vendor::create([
             'name' => $data['name'],
             'project_id' => $data['project_id'],
-            'contact_person' => $data['contact_person'],
-            'phone' => $data['phone']
+            'contact_person' => $request->input('contact_person'), 
+            'phone' => $request->input('phone')
         ]);
 
         foreach ($data['materials'] as $mat) {
@@ -74,13 +76,12 @@ class FinanceController extends Controller {
         return response()->json($vendor->load(['materials', 'project']));
     }
 
-    // EMPLOYEE LOGIC
+    // EMPLOYEE PAYROLL LOGIC (Legacy - New logic in EmployeeController)
     public function getEmployees() {
         return response()->json(Employee::orderBy('name', 'asc')->get());
     }
 
     public function storeEmployee(Request $request) {
-        // --- ADMIN CHECK ADDED HERE ---
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Only admins can add employees.'], 403);
         }

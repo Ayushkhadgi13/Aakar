@@ -32,10 +32,8 @@
 
         <div v-if="error" class="error-box">{{ error }}</div>
 
-        <div class="footer-links">
-          <span>New to Aakar?</span>
-          <router-link to="/register">Create an account</router-link>
-        </div>
+        <!-- REMOVED REGISTER LINK -->
+        <!-- <div class="footer-links">...</div> -->
       </div>
     </div>
 
@@ -65,10 +63,9 @@ const handleLogin = async () => {
   try {
     const response = await axios.post('/login', { email: email.value, password: password.value });
     
-    // Store critical info
     localStorage.setItem('token', response.data.access_token);
     localStorage.setItem('userName', response.data.user.name);
-    localStorage.setItem('userRole', response.data.user.role); // Store Role
+    localStorage.setItem('userRole', response.data.user.role); 
 
     axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
     router.push('/dashboard');
@@ -97,8 +94,6 @@ const handleLogin = async () => {
 .btn-submit { width: 100%; padding: 15px; background: var(--text-main); color: var(--bg-surface); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 20px; }
 .btn-submit:hover { opacity: 0.9; transform: translateY(-2px); }
 .error-box { color: var(--danger-text); font-size: 0.85rem; margin-top: 15px; font-weight: 600; }
-.footer-links { margin-top: 40px; font-size: 0.9rem; color: var(--text-secondary); }
-.footer-links a { color: var(--primary); text-decoration: none; font-weight: bold; margin-left: 8px; }
 .right-side { width: 60%; background-color: var(--bg-body); position: relative; display: flex; align-items: flex-end; justify-content: center; }
 .overlay-graphic { position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end; }
 .abstract-shape { position: absolute; width: 80%; height: 70%; background: var(--primary); opacity: 0.05; border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; top: 10%; right: 5%; z-index: 1; filter: blur(50px); }
