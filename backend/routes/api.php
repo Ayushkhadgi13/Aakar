@@ -40,10 +40,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/projects/{id}', [ProjectController::class, 'update']);
     Route::post('/projects/{id}/updates', [ProjectController::class, 'addUpdate']);
     Route::post('/projects/{id}/documents', [ProjectController::class, 'uploadDocument']);
+    
+    // --- NEW BOQ ROUTES ---
+    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimate']); // Add single estimate
+    Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']); // Get comparison
+    // ----------------------
 
     // Task Module Routes
     Route::get('/tasks', [TaskController::class, 'index']);
-    Route::get('/tasks/stats', [TaskController::class, 'userStats']); // <--- NEW ROUTE
+    Route::get('/tasks/stats', [TaskController::class, 'userStats']); 
     Route::get('/users-list', [TaskController::class, 'getUsers']); 
     Route::post('/tasks', [TaskController::class, 'store']);
     Route::put('/tasks/{id}', [TaskController::class, 'update']);

@@ -7,7 +7,7 @@
 
     <!-- MAIN CONTENT -->
     <div v-if="project" class="content-split">
-      <!-- LEFT: PROJECT INFO & DOCUMENTS -->
+      <!-- LEFT: PROJECT INFO & BOQ & DOCUMENTS -->
       <div class="info-sidebar">
         <!-- Info Card -->
         <div class="info-card">
@@ -31,17 +31,14 @@
             <p>{{ formatDate(project.start_date) }} - {{ project.end_date ? formatDate(project.end_date) : 'Ongoing' }}</p>
           </div>
 
-          <!-- EDITABLE PROGRESS SECTION (Admin Only Edit) -->
+          <!-- PROGRESS SECTION -->
           <div class="progress-wrap">
             <div class="p-header">
               <span>Overall Completion</span>
-              <!-- Hide edit link if not admin -->
               <div v-if="isAdmin && !isEditingProgress" class="edit-link" @click="startEditingProgress">
                 {{ project.progress }}% <span class="icon">✏️</span>
               </div>
-              <div v-else-if="!isAdmin" class="no-edit">
-                {{ project.progress }}%
-              </div>
+              <div v-else-if="!isAdmin" class="no-edit">{{ project.progress }}%</div>
               <span v-else>{{ editProgressValue }}%</span>
             </div>
 
@@ -56,6 +53,56 @@
                 <button @click="cancelEditingProgress" class="btn-xs cancel">Cancel</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- NEW: BOQ / ESTIMATES SECTION -->
+        <div class="info-card mt-20">
+          <div class="card-title-row">
+            <h3>Material Estimates (BOQ)</h3>
+            <button v-if="isAdmin" @click="showEstimateModal = true" class="add-doc-btn" title="Add Estimate">+</button>
+          </div>
+
+          <!-- Summary Stats -->
+          <div v-if="boqAnalysis" class="boq-summary">
+            <div class="boq-stat">
+              <label>Estimated</label>
+              <span>Rs. {{ Number(boqAnalysis.total_estimated_budget).toLocaleString() }}</span>
+            </div>
+            <div class="boq-stat">
+              <label>Actual</label>
+              <span :class="{'text-danger': boqAnalysis.total_actual_cost > boqAnalysis.total_estimated_budget}">
+                Rs. {{ Number(boqAnalysis.total_actual_cost).toLocaleString() }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Detailed Table -->
+          <div class="table-responsive">
+            <table v-if="boqAnalysis && boqAnalysis.boq_data.length > 0" class="boq-table">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th>Est. Cost</th>
+                  <th>Act. Cost</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, idx) in boqAnalysis.boq_data" :key="idx">
+                  <td>
+                    <div class="mat-name">{{ item.material }}</div>
+                    <small>{{ item.unit }}</small>
+                  </td>
+                  <td>{{ Number(item.est_total).toLocaleString() }}</td>
+                  <td>{{ Number(item.act_total).toLocaleString() }}</td>
+                  <td>
+                    <span :class="['status-dot', item.status === 'Over Budget' ? 'dot-red' : 'dot-green']"></span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="empty-docs">No estimates added yet.</div>
           </div>
         </div>
 
@@ -133,6 +180,39 @@
       </div>
     </div>
 
+    <!-- ESTIMATE MODAL -->
+    <div v-if="showEstimateModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Add Material Estimate</h3>
+          <button @click="showEstimateModal = false" class="close-btn">×</button>
+        </div>
+        <form @submit.prevent="saveEstimate">
+          <div class="form-group">
+            <label>Material Name</label>
+            <input type="text" v-model="estForm.material_name" required placeholder="e.g. Cement, Steel" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Est. Quantity</label>
+              <input type="number" v-model="estForm.estimated_quantity" required min="1" />
+            </div>
+            <div class="form-group">
+              <label>Unit</label>
+              <input type="text" v-model="estForm.unit" required placeholder="bags, kg" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Est. Unit Price (Rs.)</label>
+            <input type="number" v-model="estForm.estimated_unit_price" required min="0" />
+          </div>
+          <button type="submit" class="btn-save full-width" :disabled="isSavingEstimate">
+            {{ isSavingEstimate ? 'Saving...' : 'Add Estimate' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
     <!-- DOCUMENT UPLOAD MODAL -->
     <div v-if="showDocModal" class="modal-backdrop">
       <div class="modal-card">
@@ -180,7 +260,7 @@ const selectedFile = ref(null);
 const isPosting = ref(false);
 const zoomImage = ref(null);
 const errorMessage = ref(null);
-const isAdmin = ref(false); // Check role
+const isAdmin = ref(false); 
 
 // Editing Progress
 const isEditingProgress = ref(false);
@@ -192,6 +272,12 @@ const showDocModal = ref(false);
 const isUploading = ref(false);
 const docForm = ref({ type: 'BOQ', file: null });
 
+// BOQ Logic
+const boqAnalysis = ref(null);
+const showEstimateModal = ref(false);
+const isSavingEstimate = ref(false);
+const estForm = ref({ material_name: '', estimated_quantity: '', unit: '', estimated_unit_price: '' });
+
 const fetchDetails = async () => {
   try {
     const userRes = await axios.get('/user');
@@ -199,12 +285,40 @@ const fetchDetails = async () => {
 
     const res = await axios.get(`/projects/${route.params.id}`);
     project.value = res.data;
+    
+    // Fetch BOQ Analysis
+    await fetchBOQ();
+    
     scrollToBottom();
   } catch (e) {
     errorMessage.value = "Project not found.";
   }
 };
 
+const fetchBOQ = async () => {
+  try {
+    const res = await axios.get(`/projects/${route.params.id}/boq`);
+    boqAnalysis.value = res.data;
+  } catch (e) {
+    console.error("Failed to fetch BOQ", e);
+  }
+};
+
+const saveEstimate = async () => {
+  isSavingEstimate.value = true;
+  try {
+    await axios.post(`/projects/${route.params.id}/estimates`, estForm.value);
+    showEstimateModal.value = false;
+    estForm.value = { material_name: '', estimated_quantity: '', unit: '', estimated_unit_price: '' };
+    fetchBOQ(); // Refresh table
+  } catch (e) {
+    alert("Failed to save estimate.");
+  } finally {
+    isSavingEstimate.value = false;
+  }
+};
+
+// ... (Rest of existing functions remain the same) ...
 const startEditingProgress = () => {
   editProgressValue.value = project.value.progress;
   isEditingProgress.value = true;
@@ -361,6 +475,23 @@ input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px sol
 .full-width { width: 100%; }
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 3000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
 .lightbox img { max-height: 90vh; max-width: 90vw; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+
+/* BOQ Styles */
+.boq-summary { display: flex; gap: 20px; margin-bottom: 15px; background: var(--bg-input); padding: 15px; border-radius: 12px; border: 1px solid var(--border); }
+.boq-stat { display: flex; flex-direction: column; }
+.boq-stat label { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: var(--text-secondary); }
+.boq-stat span { font-weight: 800; font-size: 1.1rem; color: var(--text-main); }
+.text-danger { color: var(--danger-text) !important; }
+.table-responsive { overflow-x: auto; }
+.boq-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.boq-table th { text-align: left; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.boq-table td { padding: 10px 0; border-bottom: 1px solid var(--border); color: var(--text-main); }
+.mat-name { font-weight: 700; font-size: 0.9rem; }
+.status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.dot-red { background: var(--danger-text); }
+.dot-green { background: var(--success-text); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 1024px) { .content-split { grid-template-columns: 1fr; } .info-sidebar { display: none; } }

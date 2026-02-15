@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Project;
 use App\Models\ProjectUpdate;
-use App\Models\ProjectDocument; // Import this
+use App\Models\ProjectDocument;
+use App\Models\ProjectMaterialEstimate;
+use App\Models\VendorMaterial;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class ProjectController extends Controller {
     
@@ -26,16 +29,108 @@ class ProjectController extends Controller {
         return response()->json($query->orderBy('created_at', 'desc')->get());
     }
 
-    // Updated: Include Documents in response
     public function show($id) {
-        $project = Project::with(['updates.user', 'documents'])->findOrFail($id);
+        $project = Project::with(['updates.user', 'documents', 'estimates'])->findOrFail($id);
         return response()->json($project);
     }
 
-    // New: Upload Document
+    // New: Store Project Estimates (BOQ Setup)
+    public function storeEstimate(Request $request, $id) {
+        $request->validate([
+            'material_name' => 'required|string',
+            'estimated_quantity' => 'required|integer|min:1',
+            'estimated_unit_price' => 'required|numeric|min:0',
+            'unit' => 'required|string'
+        ]);
+
+        $estimate = ProjectMaterialEstimate::create([
+            'project_id' => $id,
+            'material_name' => $request->material_name,
+            'estimated_quantity' => $request->estimated_quantity,
+            'estimated_unit_price' => $request->estimated_unit_price,
+            'unit' => $request->unit
+        ]);
+
+        return response()->json($estimate);
+    }
+
+    // New: Compare BOQ (Estimated vs Actual)
+    public function getBOQAnalysis($id) {
+        $project = Project::findOrFail($id);
+        
+        // 1. Get Estimates
+        $estimates = ProjectMaterialEstimate::where('project_id', $id)->get();
+
+        // 2. Get Actuals (grouped by material name)
+        // We use the hasManyThrough relationship or manual query
+        $actuals = VendorMaterial::whereHas('vendor', function($q) use ($id) {
+            $q->where('project_id', $id);
+        })
+        ->select(
+            'material_name', 
+            DB::raw('SUM(quantity) as total_quantity'), 
+            DB::raw('SUM(total_price) as total_cost'),
+            DB::raw('AVG(unit_price) as avg_unit_price')
+        )
+        ->groupBy('material_name')
+        ->get()
+        ->keyBy('material_name'); // Key by name for easy lookup
+
+        // 3. Merge Data for Comparison
+        $analysis = $estimates->map(function($est) use ($actuals) {
+            // Simple string matching (case-insensitive could be improved with LOWER())
+            $actual = $actuals->get($est->material_name); 
+            
+            $estTotalCost = $est->estimated_quantity * $est->estimated_unit_price;
+            $actQuantity = $actual ? $actual->total_quantity : 0;
+            $actTotalCost = $actual ? $actual->total_cost : 0;
+
+            return [
+                'material' => $est->material_name,
+                'unit' => $est->unit,
+                // Estimated
+                'est_qty' => $est->estimated_quantity,
+                'est_rate' => $est->estimated_unit_price,
+                'est_total' => $estTotalCost,
+                // Actual
+                'act_qty' => $actQuantity,
+                'act_rate' => $actual ? round($actual->avg_unit_price, 2) : 0,
+                'act_total' => $actTotalCost,
+                // Variance
+                'qty_variance' => $est->estimated_quantity - $actQuantity, // Positive means under-consumed (Good/Bad depending on context)
+                'cost_variance' => $estTotalCost - $actTotalCost, // Positive means under budget
+                'status' => ($actTotalCost > $estTotalCost) ? 'Over Budget' : 'Within Budget'
+            ];
+        });
+
+        // Add actual items that were NOT in estimates (Unplanned expenses)
+        foreach ($actuals as $name => $data) {
+            if (!$estimates->contains('material_name', $name)) {
+                $analysis->push([
+                    'material' => $name,
+                    'unit' => 'N/A', // Unit might be inconsistent if strictly grouped
+                    'est_qty' => 0, 'est_rate' => 0, 'est_total' => 0,
+                    'act_qty' => $data->total_quantity,
+                    'act_rate' => round($data->avg_unit_price, 2),
+                    'act_total' => $data->total_cost,
+                    'qty_variance' => 0 - $data->total_quantity,
+                    'cost_variance' => 0 - $data->total_cost,
+                    'status' => 'Unplanned'
+                ]);
+            }
+        }
+
+        return response()->json([
+            'project_name' => $project->name,
+            'boq_data' => $analysis,
+            'total_estimated_budget' => $analysis->sum('est_total'),
+            'total_actual_cost' => $analysis->sum('act_total')
+        ]);
+    }
+
     public function uploadDocument(Request $request, $id) {
         $request->validate([
-            'file' => 'required|file|max:20480', // Max 20MB
+            'file' => 'required|file|max:20480',
             'type' => 'required|string|in:BOQ,Drawing,Pre-Estimation,Other'
         ]);
 
