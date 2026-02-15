@@ -192,19 +192,23 @@
             <label>Material Name</label>
             <input type="text" v-model="estForm.material_name" required placeholder="e.g. Cement, Steel" />
           </div>
+          
+          <!-- SPACED OUT ROW -->
           <div class="form-row">
             <div class="form-group">
               <label>Est. Quantity</label>
-              <input type="number" v-model="estForm.estimated_quantity" required min="1" />
+              <input type="number" v-model.number="estForm.estimated_quantity" required min="1" placeholder="0" />
             </div>
             <div class="form-group">
               <label>Unit</label>
-              <input type="text" v-model="estForm.unit" required placeholder="bags, kg" />
+              <input type="text" v-model="estForm.unit" required placeholder="e.g. bags, kg" />
             </div>
           </div>
+          <!-- END ROW -->
+
           <div class="form-group">
             <label>Est. Unit Price (Rs.)</label>
-            <input type="number" v-model="estForm.estimated_unit_price" required min="0" />
+            <input type="number" v-model.number="estForm.estimated_unit_price" required min="0" step="0.01" placeholder="0.00" />
           </div>
           <button type="submit" class="btn-save full-width" :disabled="isSavingEstimate">
             {{ isSavingEstimate ? 'Saving...' : 'Add Estimate' }}
@@ -276,7 +280,7 @@ const docForm = ref({ type: 'BOQ', file: null });
 const boqAnalysis = ref(null);
 const showEstimateModal = ref(false);
 const isSavingEstimate = ref(false);
-const estForm = ref({ material_name: '', estimated_quantity: '', unit: '', estimated_unit_price: '' });
+const estForm = ref({ material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null });
 
 const fetchDetails = async () => {
   try {
@@ -309,8 +313,8 @@ const saveEstimate = async () => {
   try {
     await axios.post(`/projects/${route.params.id}/estimates`, estForm.value);
     showEstimateModal.value = false;
-    estForm.value = { material_name: '', estimated_quantity: '', unit: '', estimated_unit_price: '' };
-    fetchBOQ(); // Refresh table
+    estForm.value = { material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null };
+    fetchBOQ(); 
   } catch (e) {
     alert("Failed to save estimate.");
   } finally {
@@ -318,7 +322,6 @@ const saveEstimate = async () => {
   }
 };
 
-// ... (Rest of existing functions remain the same) ...
 const startEditingProgress = () => {
   editProgressValue.value = project.value.progress;
   isEditingProgress.value = true;
@@ -357,7 +360,7 @@ const uploadDoc = async () => {
     });
     showDocModal.value = false;
     docForm.value.file = null;
-    fetchDetails(); // Reload docs
+    fetchDetails();
   } catch (e) {
     alert("Upload failed. Ensure file is under 20MB.");
   } finally {
@@ -490,7 +493,13 @@ input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px sol
 .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .dot-red { background: var(--danger-text); }
 .dot-green { background: var(--success-text); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+/* UPDATED FORM ROW SPACING */
+.form-row { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  gap: 25px; /* Increased spacing */
+}
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
