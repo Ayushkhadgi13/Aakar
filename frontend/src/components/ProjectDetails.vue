@@ -7,7 +7,7 @@
 
     <!-- MAIN CONTENT -->
     <div v-if="project" class="content-split">
-      <!-- LEFT: PROJECT INFO & BOQ & DOCUMENTS -->
+      <!-- LEFT: PROJECT INFO & ANALYTICS & DOCUMENTS -->
       <div class="info-sidebar">
         <!-- Info Card -->
         <div class="info-card">
@@ -56,7 +56,28 @@
           </div>
         </div>
 
-        <!-- NEW: BOQ / ESTIMATES SECTION -->
+        <!-- NEW: ANALYTICS CHARTS SECTION -->
+        <div class="info-card mt-20">
+          <h3>Project Analytics</h3>
+          <div class="charts-grid">
+            <!-- Financial Variance Chart -->
+            <div class="chart-box">
+              <h4>Budget vs Actual</h4>
+              <apexchart type="bar" height="250" :options="financialOptions" :series="financialSeries"></apexchart>
+            </div>
+            
+            <!-- Inventory Utilization Chart -->
+            <div class="chart-box">
+              <h4>Material Utilization</h4>
+              <div v-if="inventorySeries.length > 0" class="pie-wrap">
+                <apexchart type="donut" height="250" :options="inventoryOptions" :series="inventorySeries"></apexchart>
+              </div>
+              <div v-else class="empty-chart">No inventory data</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOQ / ESTIMATES SECTION -->
         <div class="info-card mt-20">
           <div class="card-title-row">
             <h3>Material Estimates (BOQ)</h3>
@@ -193,7 +214,6 @@
             <input type="text" v-model="estForm.material_name" required placeholder="e.g. Cement, Steel" />
           </div>
           
-          <!-- SPACED OUT ROW -->
           <div class="form-row">
             <div class="form-group">
               <label>Est. Quantity</label>
@@ -204,7 +224,6 @@
               <input type="text" v-model="estForm.unit" required placeholder="e.g. bags, kg" />
             </div>
           </div>
-          <!-- END ROW -->
 
           <div class="form-group">
             <label>Est. Unit Price (Rs.)</label>
@@ -256,6 +275,7 @@
 import { ref, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
+import apexchart from "vue3-apexcharts"; // Import ApexCharts
 
 const route = useRoute();
 const project = ref(null);
@@ -282,6 +302,29 @@ const showEstimateModal = ref(false);
 const isSavingEstimate = ref(false);
 const estForm = ref({ material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null });
 
+// --- CHARTS STATE ---
+const financialSeries = ref([]);
+const financialOptions = ref({
+  chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
+  colors: ['#10B981', '#EF4444'], // Green for Budget, Red for Actual
+  plotOptions: { bar: { borderRadius: 4, distributed: true, horizontal: false } },
+  dataLabels: { enabled: false },
+  xaxis: { categories: ['Estimated', 'Actual'], labels: { style: { colors: '#64748B' } } },
+  yaxis: { labels: { formatter: (val) => `Rs. ${val/1000}k` } },
+  grid: { borderColor: '#E2E8F0' },
+  legend: { show: false }
+});
+
+const inventorySeries = ref([]);
+const inventoryOptions = ref({
+  labels: ['Consumed', 'In Stock'],
+  colors: ['#A65D43', '#10B981'], // Primary for Consumed, Green for Stock
+  legend: { position: 'bottom' },
+  dataLabels: { enabled: false },
+  plotOptions: { pie: { donut: { size: '65%' } } }
+});
+// --------------------
+
 const fetchDetails = async () => {
   try {
     const userRes = await axios.get('/user');
@@ -292,6 +335,8 @@ const fetchDetails = async () => {
     
     // Fetch BOQ Analysis
     await fetchBOQ();
+    // Fetch Charts Data
+    await fetchAnalytics();
     
     scrollToBottom();
   } catch (e) {
@@ -308,6 +353,46 @@ const fetchBOQ = async () => {
   }
 };
 
+const fetchAnalytics = async () => {
+  try {
+    const pId = route.params.id;
+    // Parallel calls for faster loading
+    const [finRes, invRes] = await Promise.all([
+      axios.get(`/projects/${pId}/financial-variance`),
+      axios.get(`/projects/${pId}/inventory`)
+    ]);
+
+    // 1. Setup Financial Bar Chart
+    financialSeries.value = [{
+      name: 'Amount',
+      data: [finRes.data.estimated_total, finRes.data.actual_total]
+    }];
+
+    // 2. Setup Inventory Pie Chart
+    // Summing quantities across all materials for a "Global Utilization" view
+    let totalPurchased = 0;
+    let totalUsed = 0;
+    
+    if (invRes.data.inventory && Array.isArray(invRes.data.inventory)) {
+      invRes.data.inventory.forEach(item => {
+        totalPurchased += Number(item.total_purchased);
+        totalUsed += Number(item.total_used);
+      });
+    }
+
+    const currentStock = Math.max(0, totalPurchased - totalUsed);
+    
+    if (totalPurchased > 0) {
+      inventorySeries.value = [totalUsed, currentStock];
+    } else {
+      inventorySeries.value = []; // Shows "No data" state
+    }
+
+  } catch (e) {
+    console.error("Analytics fetch failed", e);
+  }
+};
+
 const saveEstimate = async () => {
   isSavingEstimate.value = true;
   try {
@@ -315,6 +400,7 @@ const saveEstimate = async () => {
     showEstimateModal.value = false;
     estForm.value = { material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null };
     fetchBOQ(); 
+    fetchAnalytics(); // Refresh charts
   } catch (e) {
     alert("Failed to save estimate.");
   } finally {
@@ -494,12 +580,14 @@ input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px sol
 .dot-red { background: var(--danger-text); }
 .dot-green { background: var(--success-text); }
 
-/* UPDATED FORM ROW SPACING */
-.form-row { 
-  display: grid; 
-  grid-template-columns: 1fr 1fr; 
-  gap: 25px; /* Increased spacing */
-}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+
+/* Chart Styles */
+.charts-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 15px; }
+.chart-box { background: var(--bg-input); border-radius: 16px; padding: 15px; border: 1px solid var(--border); }
+.chart-box h4 { margin: 0 0 15px 0; font-size: 0.9rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.pie-wrap { display: flex; justify-content: center; }
+.empty-chart { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 30px; font-style: italic; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
