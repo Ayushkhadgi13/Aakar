@@ -98,7 +98,7 @@ class ProjectController extends Controller {
     }
 
     /**
-     * Compare estimated BOQ against actual vendor purchases.
+     * Compare estimated BOQ against actual vendor purchases per material.
      */
     public function getBOQAnalysis($id) {
         $project = Project::findOrFail($id);
@@ -167,39 +167,33 @@ class ProjectController extends Controller {
     }
 
     /**
-     * Calculate high-level financial variance (Budget vs. Actual Costs).
+     * Compare Total Estimated Cost vs Total Actual Cost for a project.
+     * Uses highly optimized database-level aggregation to prevent memory bloat.
      */
     public function getFinancialVariance($id) {
         $project = Project::findOrFail($id);
 
-        // Fetch Total Estimated Cost directly via SQL aggregation
-        $totalEstimatedCost = ProjectMaterialEstimate::where('project_id', $id)
+        // 1. Calculate Total Estimated Cost (from ProjectMaterialEstimate)
+        $totalEstimatedCost = (float) ProjectMaterialEstimate::where('project_id', $id)
             ->selectRaw('SUM(estimated_quantity * estimated_unit_price) as total')
             ->value('total') ?? 0;
 
-        // Fetch Total Actual Cost from Vendors directly via SQL aggregation
-        $totalActualCost = VendorMaterial::whereHas('vendor', function($q) use ($id) {
+        // 2. Calculate Total Actual Cost (sum of VendorMaterial linked to project vendors)
+        $totalActualCost = (float) VendorMaterial::whereHas('vendor', function($q) use ($id) {
             $q->where('project_id', $id);
         })->sum('total_price') ?? 0;
 
-        $budget = (float) $project->budget;
-        $totalActualCost = (float) $totalActualCost;
-        $totalEstimatedCost = (float) $totalEstimatedCost;
-
-        $budgetVariance = $budget - $totalActualCost;
-        $estimateVariance = $totalEstimatedCost - $totalActualCost;
-        $percentConsumed = $budget > 0 ? ($totalActualCost / $budget) * 100 : 0;
+        // 3. Compare the two
+        $variance = $totalEstimatedCost - $totalActualCost;
 
         return response()->json([
             'project_id' => $project->id,
             'project_name' => $project->name,
-            'total_budget' => $budget,
             'total_estimated_cost' => $totalEstimatedCost,
             'total_actual_cost' => $totalActualCost,
-            'budget_variance' => $budgetVariance,
-            'estimate_variance' => $estimateVariance,
-            'budget_consumed_percentage' => round($percentConsumed, 2),
-            'status' => $budgetVariance >= 0 ? 'Under Budget' : 'Over Budget'
+            'variance_amount' => abs($variance),
+            'status' => $variance >= 0 ? 'Under Estimate' : 'Over Estimate',
+            'is_over_budget' => $variance < 0 // Useful for UI conditional styling
         ]);
     }
 
