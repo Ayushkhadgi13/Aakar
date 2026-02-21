@@ -14,14 +14,9 @@
         <!-- NAV LINKS -->
         <div class="nav-links">
           <button @click="router.push('/dashboard')" :class="['nav-item', { active: $route.path === '/dashboard' }]">Overview</button>
-          
-          <!-- HIDE FINANCE FROM EMPLOYEES -->
           <button v-if="user?.role === 'admin'" @click="router.push('/finance')" :class="['nav-item', { active: $route.path === '/finance' }]">Finance</button>
-          
           <button @click="router.push('/projects')" :class="['nav-item', { active: $route.path.startsWith('/projects') }]">Projects</button>
           <button @click="router.push('/tasks')" :class="['nav-item', { active: $route.path === '/tasks' }]">Tasks</button>
-          
-          <!-- HIDE EMPLOYEES TAB FROM EMPLOYEES -->
           <button v-if="user?.role === 'admin'" @click="router.push('/employees')" :class="['nav-item', { active: $route.path === '/employees' }]">Employees</button>
         </div>
 
@@ -54,8 +49,8 @@
       <div v-if="$route.path === '/dashboard' && user?.role === 'admin'" class="overview-container">
         <header class="page-header">
           <div class="header-text">
-            <h1>Admin Overview</h1>
-            <p>Company-wide financial and project health.</p>
+            <h1>Overview</h1>
+            <p>Financial performance and project metrics.</p>
           </div>
           <div class="date-pill">{{ todayDate }}</div>
         </header>
@@ -77,8 +72,14 @@
 
         <div class="charts-grid">
           <div class="chart-card main-chart">
-            <div class="chart-header"><h3>Financial Trend</h3></div>
-            <apexchart type="area" height="300" :options="financeChartOptions" :series="financeSeries"></apexchart>
+            <div class="chart-header">
+              <h3>Financial Trend</h3>
+              <div class="legend-custom">
+                <span class="dot inc"></span> Income
+                <span class="dot exp"></span> Expense
+              </div>
+            </div>
+            <apexchart type="bar" height="320" :options="financeChartOptions" :series="financeSeries"></apexchart>
           </div>
           <div class="chart-card side-chart">
             <div class="chart-header"><h3>Project Status</h3></div>
@@ -144,9 +145,9 @@ import apexchart from "vue3-apexcharts";
 
 const router = useRouter();
 const user = ref(null);
-const summary = ref(null); // Admin Data
-const projects = ref([]); // Admin Data
-const empStats = ref(null); // Employee Data
+const summary = ref(null); 
+const projects = ref([]); 
+const empStats = ref(null); 
 const isDark = ref(localStorage.getItem('theme') === 'dark');
 
 const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -167,22 +168,59 @@ const toggleTheme = () => {
   if (user.value?.role === 'admin') updateChartTheme();
 };
 
-/* --- CHART LOGIC (ADMIN ONLY) --- */
+/* --- PREMIUM CHART CONFIGURATION --- */
 const financeSeries = computed(() => [
   { name: 'Income', data: summary.value?.monthly_stats?.map(s => s.income) || [] },
   { name: 'Expense', data: summary.value?.monthly_stats?.map(s => s.expense) || [] }
 ]);
 
+// Premium Bar Chart Config
 const financeChartOptions = ref({
-  chart: { toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans', background: 'transparent' },
-  colors: ['#10B981', '#EF4444'],
+  chart: { 
+    type: 'bar', 
+    toolbar: { show: false }, 
+    fontFamily: 'Plus Jakarta Sans',
+    background: 'transparent' 
+  },
+  colors: ['#10B981', '#F43F5E'], // Emerald Green & Rose Red
+  plotOptions: {
+    bar: {
+      horizontal: false,
+      columnWidth: '40%', // Slimmer bars
+      borderRadius: 6,    // Smooth corners
+      borderRadiusApplication: 'end' // Only top corners
+    },
+  },
   dataLabels: { enabled: false },
-  stroke: { curve: 'smooth', width: 3 },
-  xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], labels: { style: { colors: '#64748B' } } },
-  yaxis: { labels: { style: { colors: '#64748B' } } },
-  grid: { borderColor: '#E2E8F0', strokeDashArray: 4 },
-  theme: { mode: 'light' },
-  tooltip: { theme: 'light' }
+  stroke: { show: true, width: 4, colors: ['transparent'] },
+  fill: { 
+    type: 'gradient', 
+    gradient: { shade: 'light', type: "vertical", shadeIntensity: 0.25, opacityFrom: 1, opacityTo: 0.85, stops: [0, 100] } 
+  },
+  xaxis: { 
+    categories: [],
+    axisBorder: { show: false },
+    axisTicks: { show: false },
+    labels: { style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 } } 
+  },
+  yaxis: { 
+    labels: { 
+      style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 },
+      formatter: (val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val
+    } 
+  },
+  grid: { 
+    borderColor: '#F1F5F9', 
+    strokeDashArray: 5,
+    yaxis: { lines: { show: true } },
+    xaxis: { lines: { show: false } }
+  },
+  legend: { show: false }, // Using custom legend in HTML
+  tooltip: { 
+    theme: 'light',
+    y: { formatter: (val) => `Rs. ${val.toLocaleString()}` },
+    style: { fontSize: '13px', fontFamily: 'Plus Jakarta Sans' }
+  }
 });
 
 const statusSeries = computed(() => {
@@ -192,22 +230,57 @@ const statusSeries = computed(() => {
   return Object.values(counts);
 });
 
+// Premium Donut Config
 const statusChartOptions = ref({
   labels: ['In Progress', 'Upcoming', 'Completed', 'On Hold'],
-  colors: ['#A65D43', '#64748B', '#10B981', '#F59E0B'],
-  legend: { position: 'bottom', labels: { colors: '#64748B' } },
+  colors: ['#F59E0B', '#64748B', '#10B981', '#F43F5E'],
+  legend: { 
+    position: 'bottom', 
+    markers: { radius: 12 }, 
+    itemMargin: { horizontal: 10, vertical: 5 },
+    labels: { colors: '#64748B' }
+  },
   dataLabels: { enabled: false },
   stroke: { show: false },
-  plotOptions: { pie: { donut: { size: '75%', labels: { show: false } } } },
+  plotOptions: { 
+    pie: { 
+      donut: { 
+        size: '70%',
+        labels: {
+          show: true,
+          total: {
+            show: true,
+            label: 'Projects',
+            color: '#64748B',
+            formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0)
+          }
+        } 
+      } 
+    } 
+  },
   tooltip: { theme: 'light' }
 });
 
 const updateChartTheme = () => {
   const textColor = isDark.value ? '#94A3B8' : '#64748B';
-  const gridColor = isDark.value ? '#334155' : '#E2E8F0';
+  const gridColor = isDark.value ? '#334155' : '#F1F5F9';
   const themeMode = isDark.value ? 'dark' : 'light';
-  financeChartOptions.value = { ...financeChartOptions.value, xaxis: { ...financeChartOptions.value.xaxis, labels: { style: { colors: textColor } } }, yaxis: { ...financeChartOptions.value.yaxis, labels: { style: { colors: textColor } } }, grid: { borderColor: gridColor, strokeDashArray: 4 }, theme: { mode: themeMode }, tooltip: { theme: themeMode } };
-  statusChartOptions.value = { ...statusChartOptions.value, legend: { ...statusChartOptions.value.legend, labels: { colors: textColor } }, tooltip: { theme: themeMode } };
+  
+  financeChartOptions.value = { 
+    ...financeChartOptions.value, 
+    xaxis: { ...financeChartOptions.value.xaxis, labels: { style: { colors: textColor } } }, 
+    yaxis: { ...financeChartOptions.value.yaxis, labels: { style: { colors: textColor } } }, 
+    grid: { borderColor: gridColor, strokeDashArray: 5 }, 
+    theme: { mode: themeMode }, 
+    tooltip: { theme: themeMode } 
+  };
+  
+  statusChartOptions.value = { 
+    ...statusChartOptions.value, 
+    legend: { ...statusChartOptions.value.legend, labels: { colors: textColor } },
+    plotOptions: { ...statusChartOptions.value.plotOptions, pie: { donut: { labels: { total: { color: textColor } } } } },
+    tooltip: { theme: themeMode } 
+  };
 };
 
 const fetchData = async () => {
@@ -222,9 +295,20 @@ const fetchData = async () => {
       ]);
       summary.value = sumRes.data;
       projects.value = projRes.data;
+
+      // Update Chart X-Axis with actual Month Names
+      if (summary.value.monthly_stats) {
+        financeChartOptions.value = {
+          ...financeChartOptions.value,
+          xaxis: {
+            ...financeChartOptions.value.xaxis,
+            categories: summary.value.monthly_stats.map(s => s.month)
+          }
+        };
+      }
+
       updateChartTheme();
     } else {
-      // Fetch Employee Stats
       const empRes = await axios.get('/tasks/stats');
       empStats.value = empRes.data;
     }
@@ -284,7 +368,14 @@ onMounted(() => {
 /* CHARTS & LISTS */
 .charts-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; }
 .chart-card { background: var(--bg-surface); padding: 30px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-.chart-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 20px; }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.chart-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
+
+/* Custom Legend */
+.legend-custom { display: flex; gap: 15px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+.dot.inc { background: #10B981; }
+.dot.exp { background: #F43F5E; }
 
 /* EMPLOYEE TASK LIST */
 .emp-section { background: var(--bg-surface); padding: 30px; border-radius: 24px; border: 1px solid var(--border); }
