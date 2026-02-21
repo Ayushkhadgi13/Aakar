@@ -7,7 +7,6 @@
       </div>
       <div class="header-right">
         <!-- Shortcuts -->
-        <button v-if="isAdmin" @click="showEmployeeModal = true" class="btn secondary">Add Staff</button>
         <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
         <button @click="showTransactionModal = true" class="btn primary">+ Transaction</button>
       </div>
@@ -133,35 +132,6 @@
       </div>
     </div>
 
-    <!-- EMPLOYEE MODAL (Simple Payroll Entry) -->
-    <div v-if="showEmployeeModal" class="modal-backdrop">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>Add Payroll Staff</h3>
-          <button @click="showEmployeeModal = false" class="close-btn">×</button>
-        </div>
-        <form @submit.prevent="saveEmployee">
-          <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" v-model="formE.name" required />
-          </div>
-          <div class="form-group">
-            <label>Role</label>
-            <input type="text" v-model="formE.role" required />
-          </div>
-          <div class="form-group">
-            <label>Monthly Salary (Rs.)</label>
-            <input type="number" v-model="formE.salary_amount" required />
-          </div>
-          <div class="form-group">
-            <label>Join Date</label>
-            <input type="date" v-model="formE.join_date" required />
-          </div>
-          <button type="submit" class="btn-save full-width">Add to Payroll</button>
-        </form>
-      </div>
-    </div>
-
     <!-- TRANSACTION MODAL -->
     <div v-if="showTransactionModal" class="modal-backdrop">
       <div class="modal-card">
@@ -213,7 +183,6 @@ const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
 const showVendorModal = ref(false);
-const showEmployeeModal = ref(false);
 const showTransactionModal = ref(false);
 const isAdmin = ref(false);
 const isSaving = ref(false);
@@ -227,7 +196,6 @@ const formV = ref({
   materials: [{ material_name: '', unit_price: '', quantity: '' }] 
 });
 
-const formE = ref({ name: '', role: '', salary_amount: '', join_date: '' });
 const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' });
 
 const loadData = async () => {
@@ -287,18 +255,6 @@ const saveVendor = async () => {
     alert("Failed to save vendor. Please check all fields.");
   } finally {
     isSaving.value = false;
-  }
-};
-
-// Employee Logic
-const saveEmployee = async () => {
-  try {
-    await axios.post('/finance/employees', formE.value);
-    showEmployeeModal.value = false;
-    formE.value = { name: '', role: '', salary_amount: '', join_date: '' };
-    loadData();
-  } catch(e) {
-    alert("Operation failed. Ensure you are an admin.");
   }
 };
 
