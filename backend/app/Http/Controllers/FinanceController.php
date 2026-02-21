@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\VendorMaterial;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Http\Requests\StoreTransactionRequest; // Import Request
 
 class FinanceController extends Controller {
     
@@ -55,7 +56,6 @@ class FinanceController extends Controller {
             'materials.*.quantity' => 'required|numeric|min:1',
         ]);
 
-        // Fix: Use data_get or request input to avoid "Undefined array key" error
         $vendor = Vendor::create([
             'name' => $data['name'],
             'project_id' => $data['project_id'],
@@ -109,14 +109,8 @@ class FinanceController extends Controller {
         return response()->json(['message' => 'Salary processed', 'transaction' => $transaction]);
     }
 
-    public function storeTransaction(Request $request) {
-        $data = $request->validate([
-            'type' => 'required|in:income,expense,pre-payment',
-            'amount' => 'required|numeric|min:0',
-            'category' => 'required|string',
-            'date' => 'required|date',
-            'description' => 'nullable|string',
-        ]);
-        return response()->json(Transaction::create($data));
+    public function storeTransaction(StoreTransactionRequest $request) {
+        // Validation handled by Request class
+        return response()->json(Transaction::create($request->validated()));
     }
 }

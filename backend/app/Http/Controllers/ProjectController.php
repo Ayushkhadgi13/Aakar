@@ -11,6 +11,7 @@ use App\Models\VendorMaterial;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Http\Requests\StoreProjectRequest; // Import Request
 
 class ProjectController extends Controller {
     
@@ -38,6 +39,23 @@ class ProjectController extends Controller {
     public function show($id) {
         $project = Project::with(['updates.user', 'documents', 'estimates'])->findOrFail($id);
         return response()->json($project);
+    }
+
+    /**
+     * Create a new construction project.
+     * Uses StoreProjectRequest for validation.
+     */
+    public function store(StoreProjectRequest $request) {
+        try {
+            $project = Project::create($request->validated());
+            return response()->json($project, 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Internal Server Error.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -281,32 +299,5 @@ class ProjectController extends Controller {
         ]);
 
         return response()->json($update->load('user'));
-    }
-
-    /**
-     * Create a new construction project.
-     */
-    public function store(Request $request) {
-        try {
-            $data = $request->validate([
-                'name' => 'required|string|max:255',
-                'client_name' => 'required|string|max:255',
-                'location' => 'nullable|string|max:255',
-                'budget' => 'required|numeric|min:0',
-                'status' => 'required|in:Upcoming,In Progress,On Hold,Completed',
-                'start_date' => 'required|date',
-                'end_date' => 'nullable|date|after_or_equal:start_date',
-                'progress' => 'required|integer|min:0|max:100'
-            ]);
-
-            $project = Project::create($data);
-            return response()->json($project, 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Internal Server Error.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
     }
 }

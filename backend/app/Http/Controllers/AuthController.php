@@ -6,17 +6,15 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Requests\RegisterUserRequest; // Import Request
 
 class AuthController extends Controller
 {
     // Register User (Save to Database)
-    public function register(Request $request)
+    public function register(RegisterUserRequest $request)
     {
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-        ]);
+        // Validation is handled automatically by RegisterUserRequest
+        $validatedData = $request->validated();
 
         $user = User::create([
             'name' => $validatedData['name'],
