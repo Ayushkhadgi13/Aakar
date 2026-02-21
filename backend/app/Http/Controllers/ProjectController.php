@@ -167,33 +167,56 @@ class ProjectController extends Controller {
     }
 
     /**
-     * Compare Total Estimated Cost vs Total Actual Cost for a project.
-     * Uses highly optimized database-level aggregation to prevent memory bloat.
+     * Compare Total Estimated Cost vs Total Actual Cost for a project, 
+     * including a detailed financial breakdown by material name.
      */
     public function getFinancialVariance($id) {
         $project = Project::findOrFail($id);
 
-        // 1. Calculate Total Estimated Cost (from ProjectMaterialEstimate)
-        $totalEstimatedCost = (float) ProjectMaterialEstimate::where('project_id', $id)
-            ->selectRaw('SUM(estimated_quantity * estimated_unit_price) as total')
-            ->value('total') ?? 0;
+        // 1. Fetch estimated costs grouped by material
+        $estimates = ProjectMaterialEstimate::where('project_id', $id)
+            ->select('material_name', DB::raw('SUM(estimated_quantity * estimated_unit_price) as total_estimated'))
+            ->groupBy('material_name')
+            ->get()
+            ->keyBy('material_name');
 
-        // 2. Calculate Total Actual Cost (sum of VendorMaterial linked to project vendors)
-        $totalActualCost = (float) VendorMaterial::whereHas('vendor', function($q) use ($id) {
+        // 2. Fetch actual costs grouped by material efficiently via vendor relationship
+        $actuals = VendorMaterial::whereHas('vendor', function($q) use ($id) {
             $q->where('project_id', $id);
-        })->sum('total_price') ?? 0;
+        })
+        ->select('material_name', DB::raw('SUM(total_price) as total_actual'))
+        ->groupBy('material_name')
+        ->get()
+        ->keyBy('material_name');
 
-        // 3. Compare the two
-        $variance = $totalEstimatedCost - $totalActualCost;
+        $estimatedTotal = $estimates->sum('total_estimated');
+        $actualTotal = $actuals->sum('total_actual');
+        $varianceAmount = $estimatedTotal - $actualTotal;
+
+        // 3. Build the unified breakdown array
+        $allMaterials = $estimates->keys()->merge($actuals->keys())->unique()->values();
+        
+        $breakdown = $allMaterials->map(function ($material) use ($estimates, $actuals) {
+            $estCost = (float) ($estimates->has($material) ? $estimates->get($material)->total_estimated : 0);
+            $actCost = (float) ($actuals->has($material) ? $actuals->get($material)->total_actual : 0);
+
+            return [
+                'material_name' => $material,
+                'estimated_cost' => $estCost,
+                'actual_cost' => $actCost,
+                'variance' => $estCost - $actCost,
+                'status' => ($actCost > $estCost) ? 'Over Estimate' : 'Under Estimate'
+            ];
+        });
 
         return response()->json([
             'project_id' => $project->id,
             'project_name' => $project->name,
-            'total_estimated_cost' => $totalEstimatedCost,
-            'total_actual_cost' => $totalActualCost,
-            'variance_amount' => abs($variance),
-            'status' => $variance >= 0 ? 'Under Estimate' : 'Over Estimate',
-            'is_over_budget' => $variance < 0 // Useful for UI conditional styling
+            'estimated_total' => (float) $estimatedTotal,
+            'actual_total' => (float) $actualTotal,
+            'variance_amount' => (float) $varianceAmount,
+            'is_over_budget' => $varianceAmount < 0,
+            'breakdown' => $breakdown
         ]);
     }
 
