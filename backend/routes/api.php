@@ -42,7 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/projects/{id}/documents', [ProjectController::class, 'uploadDocument']);
     
     // --- NEW BOQ ROUTES ---
-    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimate']); // Add single estimate
+    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']); // Maps to the new Bulk/Single Estimates handler
     Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']); // Get comparison
     // ----------------------
 

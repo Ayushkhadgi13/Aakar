@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\DB;
 
 class ProjectController extends Controller {
     
+    /**
+     * Get all projects (with optional search filtering).
+     */
     public function index(Request $request) {
         $query = Project::query();
 
@@ -29,13 +32,53 @@ class ProjectController extends Controller {
         return response()->json($query->orderBy('created_at', 'desc')->get());
     }
 
+    /**
+     * Fetch a specific project with related updates, documents, and estimates.
+     */
     public function show($id) {
         $project = Project::with(['updates.user', 'documents', 'estimates'])->findOrFail($id);
         return response()->json($project);
     }
 
-    // New: Store Project Estimates (BOQ Setup)
-    public function storeEstimate(Request $request, $id) {
+    /**
+     * Store material estimates (Supports highly optimized bulk inserts or single insert).
+     */
+    public function storeEstimates(Request $request, $id) {
+        // 1. Bulk Insert (Optimized for multiple estimates)
+        if ($request->has('estimates') && is_array($request->estimates)) {
+            $request->validate([
+                'estimates' => 'required|array|min:1',
+                'estimates.*.material_name' => 'required|string',
+                'estimates.*.estimated_quantity' => 'required|integer|min:1',
+                'estimates.*.estimated_unit_price' => 'required|numeric|min:0',
+                'estimates.*.unit' => 'required|string'
+            ]);
+
+            $now = now();
+            $estimatesData = [];
+
+            foreach ($request->estimates as $est) {
+                $estimatesData[] = [
+                    'project_id' => $id,
+                    'material_name' => $est['material_name'],
+                    'estimated_quantity' => $est['estimated_quantity'],
+                    'estimated_unit_price' => $est['estimated_unit_price'],
+                    'unit' => $est['unit'],
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ];
+            }
+
+            // Single query insert
+            ProjectMaterialEstimate::insert($estimatesData);
+
+            return response()->json([
+                'message' => count($estimatesData) . ' estimates successfully saved.',
+                'bulk' => true
+            ], 201);
+        }
+
+        // 2. Single Insert (Fallback)
         $request->validate([
             'material_name' => 'required|string',
             'estimated_quantity' => 'required|integer|min:1',
@@ -51,18 +94,17 @@ class ProjectController extends Controller {
             'unit' => $request->unit
         ]);
 
-        return response()->json($estimate);
+        return response()->json($estimate, 201);
     }
 
-    // New: Compare BOQ (Estimated vs Actual)
+    /**
+     * Compare estimated BOQ against actual vendor purchases.
+     */
     public function getBOQAnalysis($id) {
         $project = Project::findOrFail($id);
-        
-        // 1. Get Estimates
         $estimates = ProjectMaterialEstimate::where('project_id', $id)->get();
 
-        // 2. Get Actuals (grouped by material name)
-        // We use the hasManyThrough relationship or manual query
+        // Aggregate actual material usage dynamically
         $actuals = VendorMaterial::whereHas('vendor', function($q) use ($id) {
             $q->where('project_id', $id);
         })
@@ -74,11 +116,10 @@ class ProjectController extends Controller {
         )
         ->groupBy('material_name')
         ->get()
-        ->keyBy('material_name'); // Key by name for easy lookup
+        ->keyBy('material_name'); 
 
-        // 3. Merge Data for Comparison
+        // Merge Estimates and Actuals
         $analysis = $estimates->map(function($est) use ($actuals) {
-            // Simple string matching (case-insensitive could be improved with LOWER())
             $actual = $actuals->get($est->material_name); 
             
             $estTotalCost = $est->estimated_quantity * $est->estimated_unit_price;
@@ -88,27 +129,24 @@ class ProjectController extends Controller {
             return [
                 'material' => $est->material_name,
                 'unit' => $est->unit,
-                // Estimated
                 'est_qty' => $est->estimated_quantity,
                 'est_rate' => $est->estimated_unit_price,
                 'est_total' => $estTotalCost,
-                // Actual
                 'act_qty' => $actQuantity,
                 'act_rate' => $actual ? round($actual->avg_unit_price, 2) : 0,
                 'act_total' => $actTotalCost,
-                // Variance
-                'qty_variance' => $est->estimated_quantity - $actQuantity, // Positive means under-consumed (Good/Bad depending on context)
-                'cost_variance' => $estTotalCost - $actTotalCost, // Positive means under budget
+                'qty_variance' => $est->estimated_quantity - $actQuantity, 
+                'cost_variance' => $estTotalCost - $actTotalCost, 
                 'status' => ($actTotalCost > $estTotalCost) ? 'Over Budget' : 'Within Budget'
             ];
         });
 
-        // Add actual items that were NOT in estimates (Unplanned expenses)
+        // Add unplanned materials (Items bought but not in BOQ)
         foreach ($actuals as $name => $data) {
             if (!$estimates->contains('material_name', $name)) {
                 $analysis->push([
                     'material' => $name,
-                    'unit' => 'N/A', // Unit might be inconsistent if strictly grouped
+                    'unit' => 'N/A', 
                     'est_qty' => 0, 'est_rate' => 0, 'est_total' => 0,
                     'act_qty' => $data->total_quantity,
                     'act_rate' => round($data->avg_unit_price, 2),
@@ -128,6 +166,9 @@ class ProjectController extends Controller {
         ]);
     }
 
+    /**
+     * Upload and attach a project document.
+     */
     public function uploadDocument(Request $request, $id) {
         $request->validate([
             'file' => 'required|file|max:20480',
@@ -147,6 +188,9 @@ class ProjectController extends Controller {
         return response()->json($doc);
     }
 
+    /**
+     * Update project progress or status.
+     */
     public function update(Request $request, $id) {
         $project = Project::findOrFail($id);
         $validated = $request->validate([
@@ -157,6 +201,9 @@ class ProjectController extends Controller {
         return response()->json($project);
     }
 
+    /**
+     * Post a site update (text/image) to the project feed.
+     */
     public function addUpdate(Request $request, $id) {
         $request->validate([
             'message' => 'nullable|string',
@@ -182,6 +229,9 @@ class ProjectController extends Controller {
         return response()->json($update->load('user'));
     }
 
+    /**
+     * Create a new construction project.
+     */
     public function store(Request $request) {
         try {
             $data = $request->validate([
