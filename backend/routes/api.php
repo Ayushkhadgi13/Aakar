@@ -41,10 +41,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/projects/{id}/updates', [ProjectController::class, 'addUpdate']);
     Route::post('/projects/{id}/documents', [ProjectController::class, 'uploadDocument']);
     
-    // --- NEW BOQ ROUTES ---
-    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']); // Maps to the new Bulk/Single Estimates handler
-    Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']); // Get comparison
-    // ----------------------
+    // BOQ & Financial Routes
+    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']);
+    Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']);
+    Route::get('/projects/{id}/financial-variance', [ProjectController::class, 'getFinancialVariance']); // NEW ROUTE
 
     // Task Module Routes
     Route::get('/tasks', [TaskController::class, 'index']);

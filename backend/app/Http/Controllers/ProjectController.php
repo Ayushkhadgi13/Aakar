@@ -167,6 +167,43 @@ class ProjectController extends Controller {
     }
 
     /**
+     * Calculate high-level financial variance (Budget vs. Actual Costs).
+     */
+    public function getFinancialVariance($id) {
+        $project = Project::findOrFail($id);
+
+        // Fetch Total Estimated Cost directly via SQL aggregation
+        $totalEstimatedCost = ProjectMaterialEstimate::where('project_id', $id)
+            ->selectRaw('SUM(estimated_quantity * estimated_unit_price) as total')
+            ->value('total') ?? 0;
+
+        // Fetch Total Actual Cost from Vendors directly via SQL aggregation
+        $totalActualCost = VendorMaterial::whereHas('vendor', function($q) use ($id) {
+            $q->where('project_id', $id);
+        })->sum('total_price') ?? 0;
+
+        $budget = (float) $project->budget;
+        $totalActualCost = (float) $totalActualCost;
+        $totalEstimatedCost = (float) $totalEstimatedCost;
+
+        $budgetVariance = $budget - $totalActualCost;
+        $estimateVariance = $totalEstimatedCost - $totalActualCost;
+        $percentConsumed = $budget > 0 ? ($totalActualCost / $budget) * 100 : 0;
+
+        return response()->json([
+            'project_id' => $project->id,
+            'project_name' => $project->name,
+            'total_budget' => $budget,
+            'total_estimated_cost' => $totalEstimatedCost,
+            'total_actual_cost' => $totalActualCost,
+            'budget_variance' => $budgetVariance,
+            'estimate_variance' => $estimateVariance,
+            'budget_consumed_percentage' => round($percentConsumed, 2),
+            'status' => $budgetVariance >= 0 ? 'Under Budget' : 'Over Budget'
+        ]);
+    }
+
+    /**
      * Upload and attach a project document.
      */
     public function uploadDocument(Request $request, $id) {
