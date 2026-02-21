@@ -6,14 +6,16 @@
         <p>Manage project procurement and employee salaries.</p>
       </div>
       <div class="header-right">
-        <!-- Shortcuts -->
-        <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
-        <button @click="showTransactionModal = true" class="btn primary">+ Transaction</button>
+        <!-- Shortcuts: Only Admins can add data -->
+        <div v-if="isAdmin" class="action-buttons">
+          <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
+          <button @click="showTransactionModal = true" class="btn primary">+ Transaction</button>
+        </div>
       </div>
     </header>
 
-    <!-- KPI STATS -->
-    <section class="stats-container" v-if="summary">
+    <!-- KPI STATS (Admins Only) -->
+    <section class="stats-container" v-if="isAdmin && summary">
       <div class="stat-box">
         <label>Total Balance</label>
         <div class="value">Rs. {{ summary.total_balance?.toLocaleString() || 0 }}</div>
@@ -28,9 +30,9 @@
       </div>
     </section>
 
-    <div class="finance-grid">
-      <!-- EMPLOYEE LIST -->
-      <section class="content-card">
+    <div class="finance-grid" :class="{ 'full-width': !isAdmin }">
+      <!-- EMPLOYEE LIST (Admins Only) -->
+      <section class="content-card" v-if="isAdmin">
         <div class="card-head">
           <h2>Employee Payroll</h2>
           <span class="badge">{{ employees.length }} Staff</span>
@@ -60,16 +62,22 @@
         </table>
       </section>
 
-      <!-- VENDOR LIST -->
-      <section class="content-card">
+      <!-- VENDOR LIST (Visible to Everyone) -->
+      <section class="content-card vendor-section">
         <div class="card-head">
           <h2>Vendor Directory</h2>
+          <span class="hint-text">(Click to view details)</span>
         </div>
         <div class="vendor-list">
           <div v-if="vendors.length === 0" style="text-align:center; color: var(--text-muted); padding: 20px;">
             No vendors registered.
           </div>
-          <div v-for="vendor in vendors" :key="vendor.id" class="vendor-item">
+          <div 
+            v-for="vendor in vendors" 
+            :key="vendor.id" 
+            class="vendor-item clickable"
+            @click="viewVendor(vendor)"
+          >
             <div class="v-info">
               <h3>{{ vendor.name }}</h3>
               <span class="p-link">Project: {{ vendor.project?.name || 'Unlinked' }}</span>
@@ -81,7 +89,79 @@
       </section>
     </div>
 
-    <!-- VENDOR MODAL -->
+    <!-- 1. VENDOR DETAILS MODAL (POP-UP) -->
+    <div v-if="showDetailModal && selectedVendor" class="modal-backdrop">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h3>Vendor Details</h3>
+          <button @click="showDetailModal = false" class="close-btn">×</button>
+        </div>
+        
+        <div class="detail-content">
+          <!-- Basic Info -->
+          <div class="vendor-profile">
+            <div class="vp-row">
+              <div class="vp-item">
+                <label>Company Name</label>
+                <span>{{ selectedVendor.name }}</span>
+              </div>
+              <div class="vp-item">
+                <label>Assigned Project</label>
+                <span class="highlight-text">{{ selectedVendor.project?.name || 'N/A' }}</span>
+              </div>
+            </div>
+            <div class="vp-row">
+              <div class="vp-item">
+                <label>Contact Person</label>
+                <span>{{ selectedVendor.contact_person || '-' }}</span>
+              </div>
+              <div class="vp-item">
+                <label>Phone / Contact</label>
+                <span>{{ selectedVendor.phone || '-' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Materials Table -->
+          <h4 class="section-title">Supplied Materials</h4>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th>Unit Price</th>
+                  <th>Quantity</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!selectedVendor.materials || selectedVendor.materials.length === 0">
+                  <td colspan="4" class="text-center">No materials recorded.</td>
+                </tr>
+                <tr v-for="(mat, idx) in selectedVendor.materials" :key="idx">
+                  <td>{{ mat.material_name }}</td>
+                  <td>Rs. {{ Number(mat.unit_price).toLocaleString() }}</td>
+                  <td>{{ mat.quantity }}</td>
+                  <td><strong>Rs. {{ Number(mat.total_price).toLocaleString() }}</strong></td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="text-right"><strong>Grand Total:</strong></td>
+                  <td><strong>Rs. {{ calculateVendorTotal(selectedVendor.materials).toLocaleString() }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button @click="showDetailModal = false" class="btn secondary full-width">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. REGISTER VENDOR MODAL (Admin Only) -->
     <div v-if="showVendorModal" class="modal-backdrop">
       <div class="modal-card wide">
         <div class="modal-header">
@@ -132,7 +212,7 @@
       </div>
     </div>
 
-    <!-- TRANSACTION MODAL -->
+    <!-- 3. TRANSACTION MODAL (Admin Only) -->
     <div v-if="showTransactionModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
@@ -182,8 +262,13 @@ const summary = ref({});
 const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
+
+// Modal States
 const showVendorModal = ref(false);
 const showTransactionModal = ref(false);
+const showDetailModal = ref(false); // Controls the details popup
+const selectedVendor = ref(null);   // Stores the specific vendor clicked
+
 const isAdmin = ref(false);
 const isSaving = ref(false);
 
@@ -203,28 +288,40 @@ const loadData = async () => {
     const userRes = await axios.get('/user');
     isAdmin.value = userRes.data.role === 'admin';
 
-    // SECURITY CHECK: Redirect if not admin
-    if (!isAdmin.value) {
-      router.push('/dashboard');
-      return;
+    // 1. Fetch data accessible to ALL users
+    const commonReqs = [
+      axios.get('/finance/vendors'),
+      axios.get('/projects')
+    ];
+
+    // 2. Fetch data accessible ONLY to Admins
+    if (isAdmin.value) {
+      commonReqs.push(axios.get('/finance/summary'));
+      commonReqs.push(axios.get('/finance/employees'));
     }
 
-    const [sum, vends, emps, projs] = await Promise.all([
-      axios.get('/finance/summary'),
-      axios.get('/finance/vendors'),
-      axios.get('/finance/employees'),
-      axios.get('/projects')
-    ]);
-    summary.value = sum.data;
-    vendors.value = vends.data;
-    employees.value = emps.data;
-    projects.value = projs.data;
+    const responses = await Promise.all(commonReqs);
+
+    vendors.value = responses[0].data;
+    projects.value = responses[1].data;
+
+    if (isAdmin.value) {
+      summary.value = responses[2].data;
+      employees.value = responses[3].data;
+    }
+
   } catch (e) {
     console.error("Data load failed", e);
   }
 };
 
-// Vendor Logic
+// Vendor View Details Logic
+const viewVendor = (vendor) => {
+  selectedVendor.value = vendor;
+  showDetailModal.value = true;
+};
+
+// Vendor Create Logic
 const addMaterial = () => {
   formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' });
 };
@@ -242,7 +339,6 @@ const saveVendor = async () => {
   try {
     await axios.post('/finance/vendors', formV.value);
     showVendorModal.value = false;
-    // Reset Form
     formV.value = { 
       name: '', 
       project_id: '', 
@@ -266,7 +362,6 @@ const processSalary = async (emp) => {
   }
 };
 
-// Transaction Logic
 const saveTransaction = async () => {
   try {
     await axios.post('/finance/transactions', formT.value);
@@ -287,6 +382,7 @@ onMounted(loadData);
 .finance-page { padding: 40px; animation: fadeIn 0.4s ease-out; }
 .finance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
 .header-right { display: flex; gap: 10px; }
+.action-buttons { display: flex; gap: 10px; }
 h1 { color: var(--text-main); font-size: 2rem; font-weight: 800; margin: 0; }
 p { color: var(--text-secondary); margin-top: 5px; }
 
@@ -300,9 +396,12 @@ p { color: var(--text-secondary); margin-top: 5px; }
 
 /* GRID */
 .finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+.finance-grid.full-width { grid-template-columns: 1fr; } 
+
 .content-card { background: var(--bg-surface); padding: 30px; border-radius: 24px; border: 1px solid var(--border); }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .card-head h2 { color: var(--text-main); margin: 0; font-size: 1.25rem; font-weight: 800; }
+.hint-text { font-size: 0.8rem; color: var(--text-muted); font-weight: normal; }
 .badge { background: var(--bg-input); color: var(--text-body); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
 
 /* TABLE */
@@ -310,15 +409,32 @@ p { color: var(--text-secondary); margin-top: 5px; }
 .data-table th { text-align: left; font-size: 12px; color: var(--text-secondary); padding-bottom: 15px; }
 .data-table td { padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-body); }
 .data-table strong { color: var(--text-main); }
+.data-table tfoot td { border-top: 2px solid var(--border); padding-top: 15px; font-size: 1.1rem; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
 .pay-btn { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12px; transition: 0.2s; }
 .pay-btn:hover { opacity: 0.9; }
 
-/* VENDORS */
-.vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 0; border-top: 1px solid var(--border); }
+/* VENDORS LIST */
+.vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 0; border-top: 1px solid var(--border); transition: 0.2s; }
+.clickable { cursor: pointer; padding: 15px; border-radius: 12px; border: 1px solid transparent; border-top: 1px solid var(--border); }
+.clickable:hover { background: var(--bg-input); border-color: var(--border); transform: translateX(5px); }
+
 .v-info h3 { margin: 0; font-size: 15px; color: var(--text-main); }
 .p-link { font-size: 12px; color: var(--primary); font-weight: 700; display: block; margin-top: 2px; }
 .v-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .v-amount { font-weight: 800; color: var(--text-main); }
+
+/* VENDOR DETAIL CONTENT */
+.vendor-profile { background: var(--bg-input); padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border); }
+.vp-row { display: flex; justify-content: space-between; margin-bottom: 15px; }
+.vp-row:last-child { margin-bottom: 0; }
+.vp-item { width: 48%; }
+.vp-item label { display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+.vp-item span { font-size: 1rem; color: var(--text-main); font-weight: 600; }
+.highlight-text { color: var(--primary) !important; }
+.section-title { margin: 0 0 15px; color: var(--text-main); font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 10px; }
 
 /* MODALS */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
@@ -345,6 +461,7 @@ input:focus, select:focus { border-color: var(--primary); outline: none; }
 .btn-save { background: var(--text-main); color: var(--bg-surface); padding: 15px; width: 100%; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; margin-top: 10px; }
 .full-width { width: 100%; }
 .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); }
+.modal-footer { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 1024px) { .finance-grid { grid-template-columns: 1fr; } .stats-container { grid-template-columns: 1fr; } }
