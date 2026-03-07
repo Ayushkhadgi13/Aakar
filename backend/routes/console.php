@@ -5,6 +5,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use App\Models\Transaction;
 use App\Models\MonthlyReport;
+use App\Models\Project;
+use App\Models\User;
+use App\Notifications\ProjectStarted;
+use Illuminate\Support\Facades\Notification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +18,6 @@ Artisan::command('inspire', function () {
 
 /**
  * AUTOMATIC MONTHLY REPORT GENERATOR
- * Runs on the 1st of every month to archive the previous month's data.
  */
 Schedule::call(function () {
     $lastMonth = Carbon::now()->subMonth();
@@ -22,7 +25,6 @@ Schedule::call(function () {
     $monthNum = $lastMonth->month;
     $reportTitle = $lastMonth->format('F Y');
 
-    // Prevent duplicate reports if command is run twice
     if (MonthlyReport::where('year', $year)->where('month_number', $monthNum)->exists()) {
         return;
     }
@@ -31,7 +33,6 @@ Schedule::call(function () {
     $expense = Transaction::whereYear('date', $year)->whereMonth('date', $monthNum)->where('type', 'expense')->sum('amount');
     $count = Transaction::whereYear('date', $year)->whereMonth('date', $monthNum)->count();
     
-    // Find the category with the highest spending for that month
     $topCat = Transaction::whereYear('date', $year)
         ->whereMonth('date', $monthNum)
         ->where('type', 'expense')
@@ -51,3 +52,27 @@ Schedule::call(function () {
         'transaction_count' => $count
     ]);
 })->monthlyOn(1, '00:00');
+
+/**
+ * AUTOMATIC PROJECT STATUS UPDATE
+ * Moves 'Upcoming' projects to 'In Progress' if start_date arrived.
+ * Sends notification to Admins.
+ */
+Schedule::call(function () {
+    $today = Carbon::now()->toDateString();
+
+    $projectsToStart = Project::where('status', 'Upcoming')
+                              ->whereDate('start_date', '<=', $today)
+                              ->get();
+
+    if ($projectsToStart->isNotEmpty()) {
+        $admins = User::where('role', 'admin')->get();
+
+        foreach ($projectsToStart as $project) {
+            $project->update(['status' => 'In Progress']);
+            
+            // Send Notification to Admins
+            Notification::send($admins, new ProjectStarted($project));
+        }
+    }
+})->dailyAt('00:01'); 

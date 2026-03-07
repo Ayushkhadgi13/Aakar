@@ -3,7 +3,7 @@
     <!-- TOP NAVIGATION BAR -->
     <nav class="top-navbar">
       <div class="nav-inner">
-        <!-- BRAND (Clickable to go to Dashboard) -->
+        <!-- BRAND -->
         <div class="brand-box clickable" @click="router.push('/dashboard')" title="Go to Dashboard">
           <div class="logo-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-3.8a2 2 0 0 1 1.95-1.2h2.9a2 2 0 0 1 1.95 1.2L13 21"></path><path d="M4.6 17h6.9"></path><path d="M15 21l-3.35-7.7a2 2 0 0 1 0-1.6l3.35-7.7a2 2 0 0 1 3.6 0l3.35 7.7a2 2 0 0 1 0 1.6L18.6 21"></path></svg>
@@ -22,6 +22,29 @@
 
         <!-- USER ACTIONS -->
         <div class="user-actions">
+          <!-- NOTIFICATIONS BELL -->
+          <div class="notif-wrapper" @click.stop>
+            <button class="icon-btn" @click="toggleNotifMenu">
+              🔔
+              <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount }}</span>
+            </button>
+            <!-- DROPDOWN -->
+            <div v-if="showNotifMenu" class="notif-dropdown">
+              <div class="notif-header">
+                <strong>Notifications</strong>
+                <button v-if="notifications.length > 0" @click="markAllRead" class="text-xs">Mark all read</button>
+              </div>
+              <div v-if="notifications.length === 0" class="notif-empty">No new notifications</div>
+              <div class="notif-list" v-else>
+                <div v-for="notif in notifications" :key="notif.id" class="notif-item" @click="markAsRead(notif.id)">
+                  <p class="n-title">{{ notif.data.title }}</p>
+                  <p class="n-msg">{{ notif.data.message }}</p>
+                  <span class="n-time">{{ new Date(notif.created_at).toLocaleDateString() }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <button @click="toggleTheme" class="icon-btn theme-btn">
             <span v-if="isDark">☀️</span><span v-else>🌙</span>
           </button>
@@ -31,13 +54,12 @@
             <span class="user-role">{{ user?.role?.toUpperCase() || 'LOADING...' }}</span>
           </div>
 
-          <!-- AVATAR WRAPPER WITH USER INFO DROPDOWN -->
+          <!-- AVATAR WRAPPER -->
           <div class="avatar-wrapper" @click.stop>
             <div class="avatar clickable" @click="toggleProfileMenu" title="View Profile Info">
               {{ user?.name?.charAt(0) || 'U' }}
             </div>
             
-            <!-- PROFILE DROPDOWN MENU -->
             <div v-if="showProfileMenu" class="profile-dropdown">
               <div class="dropdown-header">
                 <strong>{{ user?.name }}</strong>
@@ -55,7 +77,6 @@
               </div>
             </div>
           </div>
-          <!-- END AVATAR WRAPPER -->
           
           <button @click="logout" class="icon-btn logout-btn" title="Logout">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -175,20 +196,17 @@ const projects = ref([]);
 const empStats = ref(null); 
 const isDark = ref(localStorage.getItem('theme') === 'dark');
 
-// State for the user profile dropdown menu
 const showProfileMenu = ref(false);
+const showNotifMenu = ref(false);
+const notifications = ref([]);
 
 const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
-// Toggles the dropdown specifically
-const toggleProfileMenu = () => {
-  showProfileMenu.value = !showProfileMenu.value;
-};
+const unreadCount = computed(() => notifications.value.length);
 
-// Closes the dropdown (triggered by clicking anywhere else on the document)
-const closeProfileMenu = () => {
-  showProfileMenu.value = false;
-};
+const toggleProfileMenu = () => { showProfileMenu.value = !showProfileMenu.value; showNotifMenu.value = false; };
+const toggleNotifMenu = () => { showNotifMenu.value = !showNotifMenu.value; showProfileMenu.value = false; };
+const closeMenus = () => { showProfileMenu.value = false; showNotifMenu.value = false; };
 
 const applyTheme = () => {
   if (isDark.value) {
@@ -212,53 +230,18 @@ const financeSeries = computed(() =>[
   { name: 'Expense', data: summary.value?.monthly_stats?.map(s => s.expense) ||[] }
 ]);
 
-// Premium Bar Chart Config
 const financeChartOptions = ref({
-  chart: { 
-    type: 'bar', 
-    toolbar: { show: false }, 
-    fontFamily: 'Plus Jakarta Sans',
-    background: 'transparent' 
-  },
-  colors:['#10B981', '#F43F5E'], 
-  plotOptions: {
-    bar: {
-      horizontal: false,
-      columnWidth: '40%', 
-      borderRadius: 6,    
-      borderRadiusApplication: 'end' 
-    },
-  },
+  chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans', background: 'transparent' },
+  colors:['#10B981', '#F43F5E'],
+  plotOptions: { bar: { horizontal: false, columnWidth: '40%', borderRadius: 6, borderRadiusApplication: 'end' } },
   dataLabels: { enabled: false },
   stroke: { show: true, width: 4, colors: ['transparent'] },
-  fill: { 
-    type: 'gradient', 
-    gradient: { shade: 'light', type: "vertical", shadeIntensity: 0.25, opacityFrom: 1, opacityTo: 0.85, stops:[0, 100] } 
-  },
-  xaxis: { 
-    categories:[],
-    axisBorder: { show: false },
-    axisTicks: { show: false },
-    labels: { style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 } } 
-  },
-  yaxis: { 
-    labels: { 
-      style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 },
-      formatter: (val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val
-    } 
-  },
-  grid: { 
-    borderColor: '#F1F5F9', 
-    strokeDashArray: 5,
-    yaxis: { lines: { show: true } },
-    xaxis: { lines: { show: false } }
-  },
-  legend: { show: false }, 
-  tooltip: { 
-    theme: 'light',
-    y: { formatter: (val) => `Rs. ${val.toLocaleString()}` },
-    style: { fontSize: '13px', fontFamily: 'Plus Jakarta Sans' }
-  }
+  fill: { type: 'gradient', gradient: { shade: 'light', type: "vertical", shadeIntensity: 0.25, opacityFrom: 1, opacityTo: 0.85, stops:[0, 100] } },
+  xaxis: { categories:[], axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 } } },
+  yaxis: { labels: { style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 }, formatter: (val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val } },
+  grid: { borderColor: '#F1F5F9', strokeDashArray: 5, yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } } },
+  legend: { show: false },
+  tooltip: { theme: 'light', y: { formatter: (val) => `Rs. ${val.toLocaleString()}` }, style: { fontSize: '13px', fontFamily: 'Plus Jakarta Sans' } }
 });
 
 const statusSeries = computed(() => {
@@ -268,34 +251,13 @@ const statusSeries = computed(() => {
   return Object.values(counts);
 });
 
-// Premium Donut Config
 const statusChartOptions = ref({
   labels:['In Progress', 'Upcoming', 'Completed', 'On Hold'],
   colors:['#F59E0B', '#64748B', '#10B981', '#F43F5E'],
-  legend: { 
-    position: 'bottom', 
-    markers: { radius: 12 }, 
-    itemMargin: { horizontal: 10, vertical: 5 },
-    labels: { colors: '#64748B' }
-  },
+  legend: { position: 'bottom', markers: { radius: 12 }, itemMargin: { horizontal: 10, vertical: 5 }, labels: { colors: '#64748B' } },
   dataLabels: { enabled: false },
   stroke: { show: false },
-  plotOptions: { 
-    pie: { 
-      donut: { 
-        size: '70%',
-        labels: {
-          show: true,
-          total: {
-            show: true,
-            label: 'Projects',
-            color: '#64748B',
-            formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0)
-          }
-        } 
-      } 
-    } 
-  },
+  plotOptions: { pie: { donut: { size: '70%', labels: { show: true, total: { show: true, label: 'Projects', color: '#64748B', formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0) } } } } },
   tooltip: { theme: 'light' }
 });
 
@@ -303,47 +265,26 @@ const updateChartTheme = () => {
   const textColor = isDark.value ? '#94A3B8' : '#64748B';
   const gridColor = isDark.value ? '#334155' : '#F1F5F9';
   const themeMode = isDark.value ? 'dark' : 'light';
-  
-  financeChartOptions.value = { 
-    ...financeChartOptions.value, 
-    xaxis: { ...financeChartOptions.value.xaxis, labels: { style: { colors: textColor } } }, 
-    yaxis: { ...financeChartOptions.value.yaxis, labels: { style: { colors: textColor } } }, 
-    grid: { borderColor: gridColor, strokeDashArray: 5 }, 
-    theme: { mode: themeMode }, 
-    tooltip: { theme: themeMode } 
-  };
-  
-  statusChartOptions.value = { 
-    ...statusChartOptions.value, 
-    legend: { ...statusChartOptions.value.legend, labels: { colors: textColor } },
-    plotOptions: { ...statusChartOptions.value.plotOptions, pie: { donut: { labels: { total: { color: textColor } } } } },
-    tooltip: { theme: themeMode } 
-  };
+  financeChartOptions.value = { ...financeChartOptions.value, xaxis: { ...financeChartOptions.value.xaxis, labels: { style: { colors: textColor } } }, yaxis: { ...financeChartOptions.value.yaxis, labels: { style: { colors: textColor } } }, grid: { borderColor: gridColor, strokeDashArray: 5 }, theme: { mode: themeMode }, tooltip: { theme: themeMode } };
+  statusChartOptions.value = { ...statusChartOptions.value, legend: { ...statusChartOptions.value.legend, labels: { colors: textColor } }, plotOptions: { ...statusChartOptions.value.plotOptions, pie: { donut: { labels: { total: { color: textColor } } } } }, tooltip: { theme: themeMode } };
 };
 
 const fetchData = async () => {
   try {
     const userRes = await axios.get('/user');
     user.value = userRes.data;
+    
+    // Fetch Notifications
+    const notifRes = await axios.get('/notifications');
+    notifications.value = notifRes.data;
 
     if (user.value.role === 'admin') {
-      const [sumRes, projRes] = await Promise.all([
-        axios.get('/finance/summary'),
-        axios.get('/projects')
-      ]);
+      const [sumRes, projRes] = await Promise.all([axios.get('/finance/summary'), axios.get('/projects')]);
       summary.value = sumRes.data;
       projects.value = projRes.data;
-
       if (summary.value.monthly_stats) {
-        financeChartOptions.value = {
-          ...financeChartOptions.value,
-          xaxis: {
-            ...financeChartOptions.value.xaxis,
-            categories: summary.value.monthly_stats.map(s => s.month)
-          }
-        };
+        financeChartOptions.value = { ...financeChartOptions.value, xaxis: { ...financeChartOptions.value.xaxis, categories: summary.value.monthly_stats.map(s => s.month) } };
       }
-
       updateChartTheme();
     } else {
       const empRes = await axios.get('/tasks/stats');
@@ -352,6 +293,20 @@ const fetchData = async () => {
   } catch (e) {
     if(e.response?.status === 401) { localStorage.clear(); router.push('/login'); }
   }
+};
+
+const markAsRead = async (id) => {
+  try {
+    await axios.post(`/notifications/${id}/read`);
+    notifications.value = notifications.value.filter(n => n.id !== id);
+  } catch (e) {}
+};
+
+const markAllRead = async () => {
+  try {
+    await axios.post('/notifications/read-all');
+    notifications.value = [];
+  } catch (e) {}
 };
 
 const logout = async () => {
@@ -363,103 +318,55 @@ const logout = async () => {
 onMounted(() => {
   applyTheme();
   fetchData();
-  document.addEventListener('click', closeProfileMenu); // Close dropdown on outside click
+  document.addEventListener('click', closeMenus);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', closeProfileMenu); // Clean up event listener
+  document.removeEventListener('click', closeMenus);
 });
 </script>
 
 <style scoped>
-/* GLOBAL & LAYOUT */
+/* GLOBAL */
 .top-navbar { position: fixed; top: 0; left: 0; width: 100%; height: 80px; background: var(--bg-nav); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .nav-inner { width: 100%; max-width: 1400px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
-
-/* BRAND */
 .brand-box { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.3rem; color: var(--text-main); }
 .brand-box.clickable { cursor: pointer; transition: opacity 0.2s; }
 .brand-box.clickable:hover { opacity: 0.8; }
 .logo-icon { width: 40px; height: 40px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
-
-/* NAV LINKS */
 .nav-links { display: flex; background: var(--bg-input); padding: 5px; border-radius: 14px; gap: 5px; border: 1px solid var(--border); }
 .nav-item { background: transparent; border: none; padding: 8px 24px; border-radius: 10px; font-size: 0.9rem; font-weight: 600; color: var(--text-body); cursor: pointer; transition: 0.2s; }
 .nav-item.active { background: var(--bg-surface); color: var(--text-main); box-shadow: var(--shadow-sm); }
 .nav-item:hover:not(.active) { color: var(--primary); background: rgba(0,0,0,0.02); }
-
-/* USER ACTIONS */
 .user-actions { display: flex; align-items: center; gap: 16px; }
-.icon-btn { background: var(--bg-surface); border: 1px solid var(--border); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
+.icon-btn { background: var(--bg-surface); border: 1px solid var(--border); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; position: relative; }
+.notif-badge { position: absolute; top: -5px; right: -5px; background: var(--danger-text); color: white; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid var(--bg-surface); }
 .user-name { font-weight: 700; color: var(--text-main); display: block; }
 .user-role { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; }
 
-/* AVATAR & DROPDOWN */
-.avatar-wrapper { position: relative; }
-.avatar { width: 42px; height: 42px; background: var(--text-main); color: var(--bg-surface); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
-.avatar.clickable { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-.avatar.clickable:hover { transform: scale(1.05); box-shadow: var(--shadow-md); }
+/* NOTIFICATION & PROFILE DROPDOWNS */
+.notif-wrapper, .avatar-wrapper { position: relative; }
+.notif-dropdown, .profile-dropdown { position: absolute; top: 55px; right: 0; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); width: 300px; z-index: 2000; overflow: hidden; animation: fadeIn 0.2s ease; text-align: left; }
+.profile-dropdown { width: 240px; }
+.notif-header, .dropdown-header { background: var(--bg-input); padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.notif-header strong { font-size: 0.95rem; color: var(--text-main); }
+.text-xs { font-size: 0.75rem; color: var(--primary); background: none; border: none; cursor: pointer; font-weight: 600; }
+.notif-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+.notif-list { max-height: 300px; overflow-y: auto; }
+.notif-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s; }
+.notif-item:hover { background: var(--bg-input); }
+.n-title { font-weight: 700; font-size: 0.9rem; margin: 0 0 4px; color: var(--text-main); }
+.n-msg { font-size: 0.85rem; color: var(--text-body); margin: 0 0 6px; line-height: 1.4; }
+.n-time { font-size: 0.7rem; color: var(--text-muted); }
 
-.profile-dropdown {
-  position: absolute;
-  top: 55px;
-  right: 0;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  width: 240px;
-  z-index: 2000;
-  overflow: hidden;
-  animation: fadeIn 0.2s ease;
-  text-align: left;
-}
-.dropdown-header {
-  background: var(--bg-input);
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.dropdown-header strong {
-  display: block;
-  color: var(--text-main);
-  font-size: 1rem;
-  margin-bottom: 4px;
-}
-.dropdown-header span {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  word-break: break-all;
-}
-.dropdown-body {
-  padding: 16px;
-}
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.info-row:last-child {
-  margin-bottom: 0;
-}
-.info-label {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-.info-value {
-  font-size: 0.85rem;
-  color: var(--text-main);
-  font-weight: 700;
-}
-.role-badge {
-  background: var(--primary);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 0.7rem;
-}
+.avatar { width: 42px; height: 42px; background: var(--text-main); color: var(--bg-surface); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.avatar.clickable { cursor: pointer; transition: transform 0.2s; }
+.avatar.clickable:hover { transform: scale(1.05); }
+.dropdown-body { padding: 16px; }
+.info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.info-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+.info-value { font-size: 0.85rem; color: var(--text-main); font-weight: 700; }
+.role-badge { background: var(--primary); color: white; padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; }
 
 /* MAIN CONTENT */
 .main-content { padding-top: 120px; padding-bottom: 60px; max-width: 1400px; margin: 0 auto; padding-left: 40px; padding-right: 40px; }
@@ -487,8 +394,6 @@ onUnmounted(() => {
 .chart-card { background: var(--bg-surface); padding: 30px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
 .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .chart-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
-
-/* Custom Legend */
 .legend-custom { display: flex; gap: 15px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .dot.inc { background: #10B981; }

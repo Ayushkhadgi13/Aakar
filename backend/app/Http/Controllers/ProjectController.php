@@ -15,13 +15,8 @@ use App\Http\Requests\StoreProjectRequest;
 
 class ProjectController extends Controller {
     
-    /**
-     * Get projects. Admins see all, Users see only assigned.
-     */
     public function index(Request $request) {
         $user = $request->user();
-
-        // Admin gets all projects, others get only assigned projects
         if ($user->role === 'admin') {
             $query = Project::query();
         } else {
@@ -36,44 +31,30 @@ class ProjectController extends Controller {
                   ->orWhere('location', 'like', "%$search%");
             });
         }
-
         return response()->json($query->orderBy('created_at', 'desc')->get());
     }
 
-    /**
-     * Fetch specific project. Validates if user has access.
-     */
     public function show(Request $request, $id) {
         $user = $request->user();
-        
-        // Load relationships including assigned users
         $project = Project::with(['updates.user', 'documents', 'estimates', 'users'])->findOrFail($id);
 
-        // Security Check: Block if user is not admin AND not assigned to the project
         if ($user->role !== 'admin' && !$project->users->contains('id', $user->id)) {
             return response()->json(['message' => 'Unauthorized access to this project.'], 403);
         }
-
         return response()->json($project);
     }
 
-    /**
-     * Create a new project.
-     */
     public function store(StoreProjectRequest $request) {
         try {
             $project = Project::create($request->validated());
             return response()->json($project, 201);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Internal Server Error.',
-                'error' => $e->getMessage()
-            ], 500);
+            return response()->json(['message' => 'Internal Server Error.', 'error' => $e->getMessage()], 500);
         }
     }
 
     /**
-     * Update project details, progress, or status.
+     * Update project. Handles auto-completion logic.
      */
     public function update(Request $request, $id) {
         $project = Project::findOrFail($id);
@@ -87,47 +68,33 @@ class ProjectController extends Controller {
             'progress' => 'sometimes|integer|min:0|max:100',
             'status' => 'sometimes|in:Upcoming,In Progress,On Hold,Completed',
         ]);
+
+        // AUTOMATION: If progress is 100, set status to Completed
+        if (isset($validated['progress']) && $validated['progress'] == 100) {
+            $validated['status'] = 'Completed';
+        }
         
         $project->update($validated);
         return response()->json($project);
     }
 
-    /**
-     * Delete a project (Admin only)
-     */
     public function destroy(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-
         $project = Project::findOrFail($id);
         $project->delete();
-
         return response()->json(['message' => 'Project deleted successfully']);
     }
 
-    /**
-     * Assign users to a project
-     */
     public function assignUsers(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Only admins can assign.'], 403);
         }
-
-        $request->validate([
-            'user_ids' => 'array',
-            'user_ids.*' => 'exists:users,id'
-        ]);
-
+        $request->validate(['user_ids' => 'array', 'user_ids.*' => 'exists:users,id']);
         $project = Project::findOrFail($id);
-        
-        // Sync replaces old assignments with the new array of IDs
         $project->users()->sync($request->user_ids); 
-
-        return response()->json([
-            'message' => 'Team updated successfully.',
-            'users' => $project->users
-        ]);
+        return response()->json(['message' => 'Team updated successfully.', 'users' => $project->users]);
     }
 
     public function storeEstimates(Request $request, $id) {
