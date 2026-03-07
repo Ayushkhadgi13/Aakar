@@ -23,14 +23,15 @@ class StoreProjectRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'        => ['required', 'string', 'max:255'],
+            'name'        =>['required', 'string', 'max:255'],
             'client_name' => ['required', 'string', 'max:255'],
             'location'    => ['nullable', 'string', 'max:255'],
-            'budget'      => ['required', 'numeric', 'min:0'],
+            // UPDATED: Changed min:0 to gt:0 to ensure budget is strictly greater than zero
+            'budget'      =>['required', 'numeric', 'gt:0'],
             'status'      => ['required', 'in:Upcoming,In Progress,On Hold,Completed'],
             'start_date'  => ['required', 'date'],
-            'end_date'    => ['nullable', 'date', 'after_or_equal:start_date'],
-            'progress'    => ['required', 'integer', 'min:0', 'max:100'],
+            'end_date'    =>['nullable', 'date', 'after_or_equal:start_date'],
+            'progress'    =>['required', 'integer', 'min:0', 'max:100'],
         ];
     }
 }

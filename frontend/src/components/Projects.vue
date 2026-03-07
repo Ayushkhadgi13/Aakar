@@ -85,7 +85,8 @@
             </div>
             <div class="form-group">
               <label>Budget (Rs.)</label>
-              <input type="number" v-model="form.budget" required min="0" />
+              <!-- UPDATED: min="1" ensures the browser will not accept 0 or negative numbers -->
+              <input type="number" v-model="form.budget" required min="1" step="0.01" placeholder="Min. Rs. 1" />
             </div>
           </div>
           <div class="form-row">
@@ -164,13 +165,19 @@ const fetchProjects = async () => {
 };
 
 const saveProject = async () => {
+  // Frontend double-check just in case
+  if (form.value.budget <= 0) {
+    alert("Project budget must be greater than 0.");
+    return;
+  }
+
   isSaving.value = true;
   try {
     await axios.post('/projects', form.value);
     closeModal();
     fetchProjects();
   } catch (e) {
-    alert("Error saving project.");
+    alert("Error saving project: " + (e.response?.data?.message || "Check fields"));
   } finally {
     isSaving.value = false;
   }
