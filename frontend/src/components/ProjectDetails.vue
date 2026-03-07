@@ -56,17 +56,36 @@
           </div>
         </div>
 
-        <!-- NEW: ANALYTICS CHARTS SECTION -->
+        <!-- NEW: PROJECT TEAM SECTION -->
+        <div class="info-card mt-20">
+          <div class="card-title-row">
+            <h3>Project Team</h3>
+            <!-- Manage Team Button for Admins -->
+            <button v-if="isAdmin" @click="openTeamModal" class="add-doc-btn" title="Manage Team">👥</button>
+          </div>
+          
+          <div class="team-list">
+             <div v-if="!project.users || project.users.length === 0" class="empty-docs">
+               No team members assigned yet.
+             </div>
+             <div v-else v-for="member in project.users" :key="member.id" class="team-member">
+                <div class="m-avatar">{{ member.name.charAt(0) }}</div>
+                <div class="m-info">
+                  <span class="m-name">{{ member.name }}</span>
+                  <span class="m-role">{{ member.role.toUpperCase() }}</span>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        <!-- ANALYTICS CHARTS SECTION -->
         <div class="info-card mt-20">
           <h3>Project Analytics</h3>
           <div class="charts-grid">
-            <!-- Financial Variance Chart -->
             <div class="chart-box">
               <h4>Budget vs Actual</h4>
               <apexchart type="bar" height="250" :options="financialOptions" :series="financialSeries"></apexchart>
             </div>
-            
-            <!-- Inventory Utilization Chart -->
             <div class="chart-box">
               <h4>Material Utilization</h4>
               <div v-if="inventorySeries.length > 0" class="pie-wrap">
@@ -83,8 +102,6 @@
             <h3>Material Estimates (BOQ)</h3>
             <button v-if="isAdmin" @click="showEstimateModal = true" class="add-doc-btn" title="Add Estimate">+</button>
           </div>
-
-          <!-- Summary Stats -->
           <div v-if="boqAnalysis" class="boq-summary">
             <div class="boq-stat">
               <label>Estimated</label>
@@ -97,8 +114,6 @@
               </span>
             </div>
           </div>
-
-          <!-- Detailed Table -->
           <div class="table-responsive">
             <table v-if="boqAnalysis && boqAnalysis.boq_data.length > 0" class="boq-table">
               <thead>
@@ -117,9 +132,7 @@
                   </td>
                   <td>{{ Number(item.est_total).toLocaleString() }}</td>
                   <td>{{ Number(item.act_total).toLocaleString() }}</td>
-                  <td>
-                    <span :class="['status-dot', item.status === 'Over Budget' ? 'dot-red' : 'dot-green']"></span>
-                  </td>
+                  <td><span :class="['status-dot', item.status === 'Over Budget' ? 'dot-red' : 'dot-green']"></span></td>
                 </tr>
               </tbody>
             </table>
@@ -133,11 +146,9 @@
             <h3>Project Documents</h3>
             <button @click="showDocModal = true" class="add-doc-btn" title="Upload Document">+</button>
           </div>
-          
           <div v-if="!project.documents || project.documents.length === 0" class="empty-docs">
             No documents uploaded.
           </div>
-
           <div v-else class="doc-list">
             <div v-for="doc in project.documents" :key="doc.id" class="doc-item">
               <div class="doc-icon">
@@ -201,6 +212,33 @@
       </div>
     </div>
 
+    <!-- ERROR VIEW -->
+    <div v-else-if="errorMessage" class="empty-docs mt-20" style="font-size: 1.2rem;">
+      🚨 {{ errorMessage }}
+    </div>
+
+    <!-- TEAM MANAGEMENT MODAL -->
+    <div v-if="showTeamModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Manage Project Team</h3>
+          <button @click="showTeamModal = false" class="close-btn">×</button>
+        </div>
+        <form @submit.prevent="saveTeam">
+          <p class="modal-hint">Select the employees working on this project:</p>
+          <div class="checkbox-list">
+            <label v-for="user in allUsers" :key="user.id" class="user-checkbox">
+              <input type="checkbox" :value="user.id" v-model="selectedUserIds">
+              <span class="check-label">{{ user.name }} <small>({{ user.role }})</small></span>
+            </label>
+          </div>
+          <button type="submit" class="btn-save full-width" :disabled="isSavingTeam">
+            {{ isSavingTeam ? 'Updating...' : 'Save Assignments' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
     <!-- ESTIMATE MODAL -->
     <div v-if="showEstimateModal" class="modal-backdrop">
       <div class="modal-card">
@@ -213,7 +251,6 @@
             <label>Material Name</label>
             <input type="text" v-model="estForm.material_name" required placeholder="e.g. Cement, Steel" />
           </div>
-          
           <div class="form-row">
             <div class="form-group">
               <label>Est. Quantity</label>
@@ -224,7 +261,6 @@
               <input type="text" v-model="estForm.unit" required placeholder="e.g. bags, kg" />
             </div>
           </div>
-
           <div class="form-group">
             <label>Est. Unit Price (Rs.)</label>
             <input type="number" v-model.number="estForm.estimated_unit_price" required min="0" step="0.01" placeholder="0.00" />
@@ -273,11 +309,13 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-import apexchart from "vue3-apexcharts"; // Import ApexCharts
+import apexchart from "vue3-apexcharts";
 
 const route = useRoute();
+const router = useRouter();
+
 const project = ref(null);
 const newMessage = ref('');
 const selectedFile = ref(null);
@@ -302,11 +340,17 @@ const showEstimateModal = ref(false);
 const isSavingEstimate = ref(false);
 const estForm = ref({ material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null });
 
+// Team Assign Logic
+const showTeamModal = ref(false);
+const allUsers = ref([]);
+const selectedUserIds = ref([]);
+const isSavingTeam = ref(false);
+
 // --- CHARTS STATE ---
 const financialSeries = ref([]);
 const financialOptions = ref({
   chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
-  colors: ['#10B981', '#EF4444'], // Green for Budget, Red for Actual
+  colors:['#10B981', '#EF4444'],
   plotOptions: { bar: { borderRadius: 4, distributed: true, horizontal: false } },
   dataLabels: { enabled: false },
   xaxis: { categories: ['Estimated', 'Actual'], labels: { style: { colors: '#64748B' } } },
@@ -318,7 +362,7 @@ const financialOptions = ref({
 const inventorySeries = ref([]);
 const inventoryOptions = ref({
   labels: ['Consumed', 'In Stock'],
-  colors: ['#A65D43', '#10B981'], // Primary for Consumed, Green for Stock
+  colors:['#A65D43', '#10B981'], 
   legend: { position: 'bottom' },
   dataLabels: { enabled: false },
   plotOptions: { pie: { donut: { size: '65%' } } }
@@ -333,14 +377,45 @@ const fetchDetails = async () => {
     const res = await axios.get(`/projects/${route.params.id}`);
     project.value = res.data;
     
-    // Fetch BOQ Analysis
     await fetchBOQ();
-    // Fetch Charts Data
     await fetchAnalytics();
     
     scrollToBottom();
   } catch (e) {
-    errorMessage.value = "Project not found.";
+    if (e.response && e.response.status === 403) {
+      errorMessage.value = "You don't have permission to view this project.";
+    } else {
+      errorMessage.value = "Project not found.";
+    }
+  }
+};
+
+const openTeamModal = async () => {
+  try {
+    // Fetch all available users for assignment
+    const res = await axios.get('/users-list');
+    allUsers.value = res.data;
+    // Pre-select currently assigned users
+    selectedUserIds.value = project.value.users.map(u => u.id);
+    showTeamModal.value = true;
+  } catch (e) {
+    alert("Could not load users.");
+  }
+};
+
+const saveTeam = async () => {
+  isSavingTeam.value = true;
+  try {
+    const res = await axios.post(`/projects/${route.params.id}/assign`, {
+      user_ids: selectedUserIds.value
+    });
+    // Update local state with the returned new assigned users array
+    project.value.users = res.data.users;
+    showTeamModal.value = false;
+  } catch (e) {
+    alert("Failed to update project team.");
+  } finally {
+    isSavingTeam.value = false;
   }
 };
 
@@ -348,31 +423,22 @@ const fetchBOQ = async () => {
   try {
     const res = await axios.get(`/projects/${route.params.id}/boq`);
     boqAnalysis.value = res.data;
-  } catch (e) {
-    console.error("Failed to fetch BOQ", e);
-  }
+  } catch (e) {}
 };
 
 const fetchAnalytics = async () => {
   try {
     const pId = route.params.id;
-    // Parallel calls for faster loading
     const [finRes, invRes] = await Promise.all([
       axios.get(`/projects/${pId}/financial-variance`),
       axios.get(`/projects/${pId}/inventory`)
     ]);
 
-    // 1. Setup Financial Bar Chart
     financialSeries.value = [{
-      name: 'Amount',
-      data: [finRes.data.estimated_total, finRes.data.actual_total]
+      name: 'Amount', data:[finRes.data.estimated_total, finRes.data.actual_total]
     }];
 
-    // 2. Setup Inventory Pie Chart
-    // Summing quantities across all materials for a "Global Utilization" view
-    let totalPurchased = 0;
-    let totalUsed = 0;
-    
+    let totalPurchased = 0; let totalUsed = 0;
     if (invRes.data.inventory && Array.isArray(invRes.data.inventory)) {
       invRes.data.inventory.forEach(item => {
         totalPurchased += Number(item.total_purchased);
@@ -381,16 +447,12 @@ const fetchAnalytics = async () => {
     }
 
     const currentStock = Math.max(0, totalPurchased - totalUsed);
-    
     if (totalPurchased > 0) {
-      inventorySeries.value = [totalUsed, currentStock];
+      inventorySeries.value =[totalUsed, currentStock];
     } else {
-      inventorySeries.value = []; // Shows "No data" state
+      inventorySeries.value =[]; 
     }
-
-  } catch (e) {
-    console.error("Analytics fetch failed", e);
-  }
+  } catch (e) {}
 };
 
 const saveEstimate = async () => {
@@ -400,87 +462,44 @@ const saveEstimate = async () => {
     showEstimateModal.value = false;
     estForm.value = { material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null };
     fetchBOQ(); 
-    fetchAnalytics(); // Refresh charts
-  } catch (e) {
-    alert("Failed to save estimate.");
-  } finally {
-    isSavingEstimate.value = false;
-  }
+    fetchAnalytics(); 
+  } catch (e) {} finally { isSavingEstimate.value = false; }
 };
 
-const startEditingProgress = () => {
-  editProgressValue.value = project.value.progress;
-  isEditingProgress.value = true;
-};
-
-const cancelEditingProgress = () => {
-  isEditingProgress.value = false;
-};
-
+const startEditingProgress = () => { editProgressValue.value = project.value.progress; isEditingProgress.value = true; };
+const cancelEditingProgress = () => { isEditingProgress.value = false; };
 const saveProgress = async () => {
   isSaving.value = true;
   try {
     await axios.put(`/projects/${project.value.id}`, { progress: editProgressValue.value });
     project.value.progress = editProgressValue.value;
     isEditingProgress.value = false;
-  } catch (e) { 
-    alert("Failed to save progress."); 
-  } finally { 
-    isSaving.value = false; 
-  }
+  } catch (e) { } finally { isSaving.value = false; }
 };
 
-const handleDocFile = (e) => {
-  docForm.value.file = e.target.files[0];
-};
-
+const handleDocFile = (e) => { docForm.value.file = e.target.files[0]; };
 const uploadDoc = async () => {
   isUploading.value = true;
   const formData = new FormData();
   formData.append('type', docForm.value.type);
   formData.append('file', docForm.value.file);
-
   try {
-    await axios.post(`/projects/${project.value.id}/documents`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    showDocModal.value = false;
-    docForm.value.file = null;
-    fetchDetails();
-  } catch (e) {
-    alert("Upload failed. Ensure file is under 20MB.");
-  } finally {
-    isUploading.value = false;
-  }
+    await axios.post(`/projects/${project.value.id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' }});
+    showDocModal.value = false; docForm.value.file = null; fetchDetails();
+  } catch (e) { alert("Upload failed."); } finally { isUploading.value = false; }
 };
 
-const scrollToBottom = () => {
-  nextTick(() => {
-    const chat = document.getElementById('chat-window');
-    if (chat) chat.scrollTop = chat.scrollHeight;
-  });
-};
-
+const scrollToBottom = () => { nextTick(() => { const chat = document.getElementById('chat-window'); if (chat) chat.scrollTop = chat.scrollHeight; }); };
 const handleFileUpload = (event) => selectedFile.value = event.target.files[0];
-
 const postUpdate = async () => {
   isPosting.value = true;
   const formData = new FormData();
   if (newMessage.value) formData.append('message', newMessage.value);
   if (selectedFile.value) formData.append('image', selectedFile.value);
-
   try {
-    await axios.post(`/projects/${route.params.id}/updates`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    newMessage.value = '';
-    selectedFile.value = null;
-    fetchDetails();
-  } catch (e) { 
-    alert("Failed to post update."); 
-  } finally { 
-    isPosting.value = false; 
-  }
+    await axios.post(`/projects/${route.params.id}/updates`, formData, { headers: { 'Content-Type': 'multipart/form-data' }});
+    newMessage.value = ''; selectedFile.value = null; fetchDetails();
+  } catch (e) { } finally { isPosting.value = false; }
 };
 
 const getImageUrl = (path) => `http://127.0.0.1:8000${path}`;
@@ -521,6 +540,23 @@ onMounted(fetchDetails);
 .card-title-row h3 { margin: 0; font-size: 1.1rem; color: var(--text-main); font-weight: 800; }
 .add-doc-btn { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); width: 30px; height: 30px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .add-doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* TEAM STYLES */
+.team-list { display: flex; flex-direction: column; gap: 10px; }
+.team-member { display: flex; align-items: center; gap: 12px; background: var(--bg-input); padding: 10px; border-radius: 12px; border: 1px solid var(--border); }
+.m-avatar { width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+.m-info { display: flex; flex-direction: column; }
+.m-name { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
+.m-role { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+
+.modal-hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; }
+.checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 10px; margin-bottom: 20px; }
+.user-checkbox { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--bg-input); border-radius: 10px; cursor: pointer; border: 1px solid var(--border); transition: 0.2s; }
+.user-checkbox:hover { border-color: var(--primary); }
+.user-checkbox input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); margin: 0; }
+.check-label { font-size: 0.95rem; color: var(--text-main); font-weight: 600; }
+.check-label small { color: var(--text-secondary); font-weight: normal; margin-left: 5px; }
+
 .doc-list { display: flex; flex-direction: column; gap: 10px; }
 .doc-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border); transition: 0.2s; }
 .doc-item:hover { border-color: var(--primary); transform: translateX(2px); }
