@@ -73,7 +73,41 @@ class ProjectController extends Controller {
     }
 
     /**
-     * NEW: Assign users to a project
+     * Update project details, progress, or status.
+     */
+    public function update(Request $request, $id) {
+        $project = Project::findOrFail($id);
+        
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'client_name' => 'sometimes|string|max:255',
+            'location' => 'nullable|string|max:255',
+            'budget' => 'sometimes|numeric|gt:0',
+            'start_date' => 'sometimes|date',
+            'progress' => 'sometimes|integer|min:0|max:100',
+            'status' => 'sometimes|in:Upcoming,In Progress,On Hold,Completed',
+        ]);
+        
+        $project->update($validated);
+        return response()->json($project);
+    }
+
+    /**
+     * Delete a project (Admin only)
+     */
+    public function destroy(Request $request, $id) {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $project = Project::findOrFail($id);
+        $project->delete();
+
+        return response()->json(['message' => 'Project deleted successfully']);
+    }
+
+    /**
+     * Assign users to a project
      */
     public function assignUsers(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
@@ -95,9 +129,6 @@ class ProjectController extends Controller {
             'users' => $project->users
         ]);
     }
-
-    // ... KEEP ALL OTHER EXISTING METHODS BELOW THIS LINE UNCHANGED ...
-    // (storeEstimates, getBOQAnalysis, getFinancialVariance, uploadDocument, update, addUpdate)
 
     public function storeEstimates(Request $request, $id) {
         if ($request->has('estimates') && is_array($request->estimates)) {
@@ -231,13 +262,6 @@ class ProjectController extends Controller {
         $path = $file->store('project_docs', 'public');
         $doc = ProjectDocument::create(['project_id' => $id, 'file_type' => $request->type, 'original_name' => $file->getClientOriginalName(), 'file_path' => '/storage/' . $path]);
         return response()->json($doc);
-    }
-
-    public function update(Request $request, $id) {
-        $project = Project::findOrFail($id);
-        $validated = $request->validate(['progress' => 'sometimes|integer|min:0|max:100', 'status' => 'sometimes|in:Upcoming,In Progress,On Hold,Completed']);
-        $project->update($validated);
-        return response()->json($project);
     }
 
     public function addUpdate(Request $request, $id) {

@@ -11,7 +11,7 @@
           <input type="text" v-model="searchQuery" @input="fetchProjects" placeholder="Search projects..." />
         </div>
         <!-- HIDE BUTTON IF NOT ADMIN -->
-        <button v-if="isAdmin" @click="showModal = true" class="btn primary">+ New Project</button>
+        <button v-if="isAdmin" @click="openCreateModal" class="btn primary">+ New Project</button>
       </div>
     </header>
 
@@ -25,7 +25,17 @@
           <span :class="['status-badge', project.status.toLowerCase().replace(' ', '-')]">
             {{ project.status }}
           </span>
-          <div class="card-dots">•••</div>
+          
+          <!-- 3 DOTS MENU (Admin Only) -->
+          <div v-if="isAdmin" class="card-dots-wrapper" @click.stop>
+            <div class="card-dots" @click="toggleDropdown(project.id)">•••</div>
+            
+            <div v-if="activeDropdown === project.id" class="context-menu">
+              <button @click="openEditModal(project)">✏️ Edit</button>
+              <button class="text-danger" @click="deleteProject(project.id)">🗑️ Delete</button>
+            </div>
+          </div>
+
         </div>
 
         <div class="card-content">
@@ -62,11 +72,11 @@
       </div>
     </div>
 
-    <!-- NEW PROJECT MODAL -->
+    <!-- CREATE/EDIT PROJECT MODAL -->
     <div v-if="showModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>New Project</h3>
+          <h3>{{ isEditing ? 'Edit Project' : 'New Project' }}</h3>
           <button @click="closeModal" class="close-btn">×</button>
         </div>
         <form @submit.prevent="saveProject">
@@ -85,7 +95,6 @@
             </div>
             <div class="form-group">
               <label>Budget (Rs.)</label>
-              <!-- UPDATED: min="1" ensures the browser will not accept 0 or negative numbers -->
               <input type="number" v-model="form.budget" required min="1" step="0.01" placeholder="Min. Rs. 1" />
             </div>
           </div>
@@ -105,12 +114,12 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Initial Progress: {{ form.progress }}%</label>
+            <label>Progress: {{ form.progress }}%</label>
             <input type="range" v-model.number="form.progress" min="0" max="100" class="range-slider" />
           </div>
           <div class="modal-footer">
             <button type="submit" class="btn-save full-width" :disabled="isSaving">
-                {{ isSaving ? 'Saving...' : 'Create Project' }}
+                {{ isSaving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create Project') }}
             </button>
           </div>
         </form>
@@ -120,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 
@@ -131,6 +140,11 @@ const showModal = ref(false);
 const loading = ref(false);
 const isSaving = ref(false);
 const isAdmin = ref(false);
+
+// Dropdown & Edit State
+const activeDropdown = ref(null);
+const isEditing = ref(false);
+const editId = ref(null);
 
 const initialForm = {
   name: '', 
@@ -143,6 +157,38 @@ const initialForm = {
 };
 
 const form = ref({ ...initialForm });
+
+// Close dropdown if clicked outside
+const closeDropdown = () => {
+  activeDropdown.value = null;
+};
+
+const toggleDropdown = (id) => {
+  activeDropdown.value = activeDropdown.value === id ? null : id;
+};
+
+const openCreateModal = () => {
+  isEditing.value = false;
+  editId.value = null;
+  form.value = { ...initialForm };
+  showModal.value = true;
+};
+
+const openEditModal = (project) => {
+  activeDropdown.value = null; // close menu
+  isEditing.value = true;
+  editId.value = project.id;
+  form.value = { 
+    name: project.name,
+    client_name: project.client_name,
+    location: project.location,
+    budget: project.budget,
+    status: project.status,
+    start_date: project.start_date,
+    progress: project.progress
+  };
+  showModal.value = true;
+};
 
 const closeModal = () => {
     showModal.value = false;
@@ -165,7 +211,6 @@ const fetchProjects = async () => {
 };
 
 const saveProject = async () => {
-  // Frontend double-check just in case
   if (form.value.budget <= 0) {
     alert("Project budget must be greater than 0.");
     return;
@@ -173,13 +218,29 @@ const saveProject = async () => {
 
   isSaving.value = true;
   try {
-    await axios.post('/projects', form.value);
+    if (isEditing.value) {
+      await axios.put(`/projects/${editId.value}`, form.value);
+    } else {
+      await axios.post('/projects', form.value);
+    }
     closeModal();
     fetchProjects();
   } catch (e) {
     alert("Error saving project: " + (e.response?.data?.message || "Check fields"));
   } finally {
     isSaving.value = false;
+  }
+};
+
+const deleteProject = async (id) => {
+  activeDropdown.value = null; // close menu
+  if (confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+    try {
+      await axios.delete(`/projects/${id}`);
+      fetchProjects();
+    } catch (e) {
+      alert("Failed to delete project.");
+    }
   }
 };
 
@@ -193,7 +254,14 @@ const getProgressColor = (p) => {
   return '#10b981';
 };
 
-onMounted(fetchProjects);
+onMounted(() => {
+  fetchProjects();
+  document.addEventListener('click', closeDropdown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdown);
+});
 </script>
 
 <style scoped>
@@ -206,12 +274,26 @@ onMounted(fetchProjects);
 .search-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(166, 93, 67, 0.1); }
 .search-box input { border: none; padding: 12px; outline: none; width: 100%; font-size: 0.95rem; color: var(--text-main); background: transparent; }
 .icon-search { margin-right: 8px; filter: grayscale(1); opacity: 0.5; }
+
 .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 25px; }
-.project-card { background: var(--bg-surface); border-radius: 20px; padding: 25px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); position: relative; overflow: hidden; cursor: pointer; }
+
+/* NOTE: Removed overflow: hidden so dropdown menu can overflow outside the card bounds */
+.project-card { background: var(--bg-surface); border-radius: 20px; padding: 25px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); position: relative; cursor: pointer; }
 .project-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+
 .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-.card-dots { color: var(--text-muted); }
+
+/* 3 DOTS & DROPDOWN STYLES */
+.card-dots-wrapper { position: relative; }
+.card-dots { font-size: 1.2rem; color: var(--text-muted); cursor: pointer; padding: 0 5px; letter-spacing: 2px; transition: color 0.2s; }
+.card-dots:hover { color: var(--text-main); }
+.context-menu { position: absolute; right: 0; top: 25px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 50; display: flex; flex-direction: column; min-width: 140px; overflow: hidden; padding: 5px; }
+.context-menu button { padding: 10px 15px; text-align: left; background: transparent; border: none; font-size: 0.85rem; font-weight: 600; color: var(--text-body); cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; border-radius: 8px; }
+.context-menu button:hover { background: var(--bg-input); color: var(--text-main); }
+.context-menu button.text-danger { color: var(--danger-text); }
+.context-menu button.text-danger:hover { background: var(--danger-bg); }
+
 .upcoming { background: var(--bg-input); color: var(--text-body); }
 .in-progress { background: var(--warning-bg); color: var(--warning-text); }
 .on-hold { background: var(--danger-bg); color: var(--danger-text); }
