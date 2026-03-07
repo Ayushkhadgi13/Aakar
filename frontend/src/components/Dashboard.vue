@@ -3,8 +3,8 @@
     <!-- TOP NAVIGATION BAR -->
     <nav class="top-navbar">
       <div class="nav-inner">
-        <!-- BRAND -->
-        <div class="brand-box">
+        <!-- BRAND (Clickable to go to Dashboard) -->
+        <div class="brand-box clickable" @click="router.push('/dashboard')" title="Go to Dashboard">
           <div class="logo-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-3.8a2 2 0 0 1 1.95-1.2h2.9a2 2 0 0 1 1.95 1.2L13 21"></path><path d="M4.6 17h6.9"></path><path d="M15 21l-3.35-7.7a2 2 0 0 1 0-1.6l3.35-7.7a2 2 0 0 1 3.6 0l3.35 7.7a2 2 0 0 1 0 1.6L18.6 21"></path></svg>
           </div>
@@ -30,7 +30,32 @@
             <span class="user-name">{{ user?.name || 'User' }}</span>
             <span class="user-role">{{ user?.role?.toUpperCase() || 'LOADING...' }}</span>
           </div>
-          <div class="avatar">{{ user?.name?.charAt(0) || 'U' }}</div>
+
+          <!-- AVATAR WRAPPER WITH USER INFO DROPDOWN -->
+          <div class="avatar-wrapper" @click.stop>
+            <div class="avatar clickable" @click="toggleProfileMenu" title="View Profile Info">
+              {{ user?.name?.charAt(0) || 'U' }}
+            </div>
+            
+            <!-- PROFILE DROPDOWN MENU -->
+            <div v-if="showProfileMenu" class="profile-dropdown">
+              <div class="dropdown-header">
+                <strong>{{ user?.name }}</strong>
+                <span>{{ user?.email }}</span>
+              </div>
+              <div class="dropdown-body">
+                <div class="info-row">
+                  <span class="info-label">Role:</span>
+                  <span class="info-value role-badge">{{ user?.role?.toUpperCase() }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Joined:</span>
+                  <span class="info-value">{{ user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END AVATAR WRAPPER -->
           
           <button @click="logout" class="icon-btn logout-btn" title="Logout">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -138,7 +163,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import apexchart from "vue3-apexcharts";
@@ -150,7 +175,20 @@ const projects = ref([]);
 const empStats = ref(null); 
 const isDark = ref(localStorage.getItem('theme') === 'dark');
 
+// State for the user profile dropdown menu
+const showProfileMenu = ref(false);
+
 const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+// Toggles the dropdown specifically
+const toggleProfileMenu = () => {
+  showProfileMenu.value = !showProfileMenu.value;
+};
+
+// Closes the dropdown (triggered by clicking anywhere else on the document)
+const closeProfileMenu = () => {
+  showProfileMenu.value = false;
+};
 
 const applyTheme = () => {
   if (isDark.value) {
@@ -169,9 +207,9 @@ const toggleTheme = () => {
 };
 
 /* --- PREMIUM CHART CONFIGURATION --- */
-const financeSeries = computed(() => [
+const financeSeries = computed(() =>[
   { name: 'Income', data: summary.value?.monthly_stats?.map(s => s.income) || [] },
-  { name: 'Expense', data: summary.value?.monthly_stats?.map(s => s.expense) || [] }
+  { name: 'Expense', data: summary.value?.monthly_stats?.map(s => s.expense) ||[] }
 ]);
 
 // Premium Bar Chart Config
@@ -182,23 +220,23 @@ const financeChartOptions = ref({
     fontFamily: 'Plus Jakarta Sans',
     background: 'transparent' 
   },
-  colors: ['#10B981', '#F43F5E'], // Emerald Green & Rose Red
+  colors:['#10B981', '#F43F5E'], 
   plotOptions: {
     bar: {
       horizontal: false,
-      columnWidth: '40%', // Slimmer bars
-      borderRadius: 6,    // Smooth corners
-      borderRadiusApplication: 'end' // Only top corners
+      columnWidth: '40%', 
+      borderRadius: 6,    
+      borderRadiusApplication: 'end' 
     },
   },
   dataLabels: { enabled: false },
   stroke: { show: true, width: 4, colors: ['transparent'] },
   fill: { 
     type: 'gradient', 
-    gradient: { shade: 'light', type: "vertical", shadeIntensity: 0.25, opacityFrom: 1, opacityTo: 0.85, stops: [0, 100] } 
+    gradient: { shade: 'light', type: "vertical", shadeIntensity: 0.25, opacityFrom: 1, opacityTo: 0.85, stops:[0, 100] } 
   },
   xaxis: { 
-    categories: [],
+    categories:[],
     axisBorder: { show: false },
     axisTicks: { show: false },
     labels: { style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 } } 
@@ -215,7 +253,7 @@ const financeChartOptions = ref({
     yaxis: { lines: { show: true } },
     xaxis: { lines: { show: false } }
   },
-  legend: { show: false }, // Using custom legend in HTML
+  legend: { show: false }, 
   tooltip: { 
     theme: 'light',
     y: { formatter: (val) => `Rs. ${val.toLocaleString()}` },
@@ -224,7 +262,7 @@ const financeChartOptions = ref({
 });
 
 const statusSeries = computed(() => {
-  if (!projects.value.length) return [];
+  if (!projects.value.length) return[];
   const counts = { 'In Progress': 0, 'Upcoming': 0, 'Completed': 0, 'On Hold': 0 };
   projects.value.forEach(p => counts[p.status]++);
   return Object.values(counts);
@@ -232,8 +270,8 @@ const statusSeries = computed(() => {
 
 // Premium Donut Config
 const statusChartOptions = ref({
-  labels: ['In Progress', 'Upcoming', 'Completed', 'On Hold'],
-  colors: ['#F59E0B', '#64748B', '#10B981', '#F43F5E'],
+  labels:['In Progress', 'Upcoming', 'Completed', 'On Hold'],
+  colors:['#F59E0B', '#64748B', '#10B981', '#F43F5E'],
   legend: { 
     position: 'bottom', 
     markers: { radius: 12 }, 
@@ -296,7 +334,6 @@ const fetchData = async () => {
       summary.value = sumRes.data;
       projects.value = projRes.data;
 
-      // Update Chart X-Axis with actual Month Names
       if (summary.value.monthly_stats) {
         financeChartOptions.value = {
           ...financeChartOptions.value,
@@ -326,6 +363,11 @@ const logout = async () => {
 onMounted(() => {
   applyTheme();
   fetchData();
+  document.addEventListener('click', closeProfileMenu); // Close dropdown on outside click
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeProfileMenu); // Clean up event listener
 });
 </script>
 
@@ -333,18 +375,93 @@ onMounted(() => {
 /* GLOBAL & LAYOUT */
 .top-navbar { position: fixed; top: 0; left: 0; width: 100%; height: 80px; background: var(--bg-nav); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .nav-inner { width: 100%; max-width: 1400px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
+
+/* BRAND */
 .brand-box { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.3rem; color: var(--text-main); }
+.brand-box.clickable { cursor: pointer; transition: opacity 0.2s; }
+.brand-box.clickable:hover { opacity: 0.8; }
 .logo-icon { width: 40px; height: 40px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+
+/* NAV LINKS */
 .nav-links { display: flex; background: var(--bg-input); padding: 5px; border-radius: 14px; gap: 5px; border: 1px solid var(--border); }
 .nav-item { background: transparent; border: none; padding: 8px 24px; border-radius: 10px; font-size: 0.9rem; font-weight: 600; color: var(--text-body); cursor: pointer; transition: 0.2s; }
 .nav-item.active { background: var(--bg-surface); color: var(--text-main); box-shadow: var(--shadow-sm); }
 .nav-item:hover:not(.active) { color: var(--primary); background: rgba(0,0,0,0.02); }
+
+/* USER ACTIONS */
 .user-actions { display: flex; align-items: center; gap: 16px; }
 .icon-btn { background: var(--bg-surface); border: 1px solid var(--border); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
 .user-name { font-weight: 700; color: var(--text-main); display: block; }
 .user-role { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; }
-.avatar { width: 42px; height: 42px; background: var(--text-main); color: var(--bg-surface); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
 
+/* AVATAR & DROPDOWN */
+.avatar-wrapper { position: relative; }
+.avatar { width: 42px; height: 42px; background: var(--text-main); color: var(--bg-surface); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.avatar.clickable { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+.avatar.clickable:hover { transform: scale(1.05); box-shadow: var(--shadow-md); }
+
+.profile-dropdown {
+  position: absolute;
+  top: 55px;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  width: 240px;
+  z-index: 2000;
+  overflow: hidden;
+  animation: fadeIn 0.2s ease;
+  text-align: left;
+}
+.dropdown-header {
+  background: var(--bg-input);
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.dropdown-header strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.dropdown-header span {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+.dropdown-body {
+  padding: 16px;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.info-row:last-child {
+  margin-bottom: 0;
+}
+.info-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.info-value {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  font-weight: 700;
+}
+.role-badge {
+  background: var(--primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+}
+
+/* MAIN CONTENT */
 .main-content { padding-top: 120px; padding-bottom: 60px; max-width: 1400px; margin: 0 auto; padding-left: 40px; padding-right: 40px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .header-text h1 { font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin: 0; }
@@ -391,6 +508,7 @@ onMounted(() => {
 .pending { background: var(--warning-bg); color: var(--warning-text); }
 .in-progress { background: #DBEAFE; color: #1E40AF; }
 
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 1024px) { .charts-grid { grid-template-columns: 1fr; } }
 @media (max-width: 768px) { .nav-links { display: none; } .page-header { flex-direction: column; align-items: flex-start; gap: 15px; } }
 </style>
