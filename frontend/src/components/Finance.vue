@@ -266,8 +266,8 @@ const projects = ref([]);
 // Modal States
 const showVendorModal = ref(false);
 const showTransactionModal = ref(false);
-const showDetailModal = ref(false); // Controls the details popup
-const selectedVendor = ref(null);   // Stores the specific vendor clicked
+const showDetailModal = ref(false);
+const selectedVendor = ref(null);
 
 const isAdmin = ref(false);
 const isSaving = ref(false);
@@ -289,7 +289,7 @@ const loadData = async () => {
     isAdmin.value = userRes.data.role === 'admin';
 
     // 1. Fetch data accessible to ALL users
-    const commonReqs = [
+    const commonReqs =[
       axios.get('/finance/vendors'),
       axios.get('/projects')
     ];
@@ -315,13 +315,11 @@ const loadData = async () => {
   }
 };
 
-// Vendor View Details Logic
 const viewVendor = (vendor) => {
   selectedVendor.value = vendor;
   showDetailModal.value = true;
 };
 
-// Vendor Create Logic
 const addMaterial = () => {
   formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' });
 };
@@ -344,7 +342,7 @@ const saveVendor = async () => {
       project_id: '', 
       contact_person: '', 
       phone: '', 
-      materials: [{ material_name: '', unit_price: '', quantity: '' }] 
+      materials:[{ material_name: '', unit_price: '', quantity: '' }] 
     };
     loadData();
   } catch (e) {
@@ -356,9 +354,18 @@ const saveVendor = async () => {
 
 const processSalary = async (emp) => {
   if (confirm(`Record salary payment of Rs. ${emp.salary_amount} for ${emp.name}?`)) {
-    await axios.post(`/finance/employees/${emp.id}/pay`);
-    alert("Salary payment added to expenses!");
-    loadData();
+    try {
+      await axios.post(`/finance/employees/${emp.id}/pay`);
+      alert("Salary payment added to expenses!");
+      loadData(); // Refresh summary data
+    } catch (e) {
+      // NEW: Catch the 422 error thrown by backend if already paid this month
+      if (e.response && e.response.status === 422) {
+        alert(e.response.data.message);
+      } else {
+        alert("Failed to process salary payment.");
+      }
+    }
   }
 };
 

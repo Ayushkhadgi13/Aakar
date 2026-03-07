@@ -9,10 +9,11 @@ use App\Models\Employee;
 use App\Models\VendorMaterial;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use App\Http\Requests\StoreTransactionRequest; // Import Request
+use App\Http\Requests\StoreTransactionRequest;
 
 class FinanceController extends Controller {
     
+
     public function getSummary() {
         $income = (float) Transaction::where('type', 'income')->sum('amount');
         $expense = (float) Transaction::where('type', 'expense')->sum('amount');
@@ -44,7 +45,6 @@ class FinanceController extends Controller {
     }
 
     public function storeVendor(Request $request) {
-        // Validation
         $data = $request->validate([
             'name' => 'required|string',
             'project_id' => 'required|exists:projects,id',
@@ -72,11 +72,9 @@ class FinanceController extends Controller {
                 'total_price' => $mat['unit_price'] * $mat['quantity']
             ]);
         }
-
         return response()->json($vendor->load(['materials', 'project']));
     }
 
-    // EMPLOYEE PAYROLL LOGIC (Legacy - New logic in EmployeeController)
     public function getEmployees() {
         return response()->json(Employee::orderBy('name', 'asc')->get());
     }
@@ -95,22 +93,43 @@ class FinanceController extends Controller {
         return response()->json(Employee::create($data));
     }
 
+    /**
+     * UPDATED: Process Salary and check for duplicates in current month
+     */
     public function paySalary(Request $request, $id) {
         $employee = Employee::findOrFail($id);
+        
+        $currentMonth = Carbon::now()->month;
+        $currentYear = Carbon::now()->year;
+        
+        $descriptionPrefix = "Salary payment for " . $employee->name;
+
+        // Check if a salary transaction already exists for this employee this month
+        $alreadyPaid = Transaction::where('category', 'Salary')
+            ->where('description', 'LIKE', $descriptionPrefix . '%')
+            ->whereMonth('date', $currentMonth)
+            ->whereYear('date', $currentYear)
+            ->exists();
+
+        if ($alreadyPaid) {
+            // Return 422 Unprocessable Entity status code to indicate the action cannot be performed
+            return response()->json([
+                'message' => 'Salary already paid for ' . $employee->name . ' this month.'
+            ], 422);
+        }
         
         $transaction = Transaction::create([
             'type' => 'expense',
             'amount' => $employee->salary_amount,
             'category' => 'Salary',
             'date' => Carbon::now()->toDateString(),
-            'description' => "Salary payment for " . $employee->name . " - " . Carbon::now()->format('F Y'),
+            'description' => $descriptionPrefix . " - " . Carbon::now()->format('F Y'),
         ]);
 
-        return response()->json(['message' => 'Salary processed', 'transaction' => $transaction]);
+        return response()->json(['message' => 'Salary processed successfully', 'transaction' => $transaction]);
     }
 
     public function storeTransaction(StoreTransactionRequest $request) {
-        // Validation handled by Request class
         return response()->json(Transaction::create($request->validated()));
     }
 }
