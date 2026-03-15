@@ -132,6 +132,7 @@ class ProjectController extends Controller {
                 ]);
             }
         }
+
         return response()->json([
             'project_name' => $project->name,
             'boq_data' => $analysis,
@@ -159,7 +160,7 @@ class ProjectController extends Controller {
         $breakdown = $allMaterials->map(function ($material) use ($estimates, $actuals) {
             $estCost = (float) ($estimates->has($material) ? $estimates->get($material)->total_estimated : 0);
             $actCost = (float) ($actuals->has($material) ? $actuals->get($material)->total_actual : 0);
-            return[
+            return [
                 'material_name' => $material,
                 'estimated_cost' => $estCost,
                 'actual_cost' => $actCost,
@@ -167,6 +168,7 @@ class ProjectController extends Controller {
                 'status' => ($actCost > $estCost) ? 'Over Estimate' : 'Under Estimate'
             ];
         });
+
         return response()->json([
             'project_id' => $project->id, 'project_name' => $project->name,
             'estimated_total' => (float) $estimatedTotal, 'actual_total' => (float) $actualTotal,
@@ -183,7 +185,6 @@ class ProjectController extends Controller {
 
         $file = $request->file('file');
         $path = $file->store('project_docs', 'public');
-
         $status = $request->type === 'BOQ' ? 'pending' : 'approved';
 
         $doc = ProjectDocument::create([
@@ -222,17 +223,24 @@ class ProjectController extends Controller {
     }
 
     /**
-     * Admin deletes a rejected document.
+     * Any team member (or admin) can delete a rejected BOQ document.
+     * Regular users must belong to the project the document is attached to.
      */
     public function deleteDocument(Request $request, $id) {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $doc = ProjectDocument::findOrFail($id);
+        $user = $request->user();
 
+        // Only rejected documents can be removed
         if ($doc->status !== 'rejected') {
             return response()->json(['message' => 'Only rejected documents can be deleted.'], 422);
+        }
+
+        // Non-admins must be a member of the project this document belongs to
+        if ($user->role !== 'admin') {
+            $isMember = $user->projects()->where('projects.id', $doc->project_id)->exists();
+            if (!$isMember) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
         }
 
         // Remove the physical file from storage

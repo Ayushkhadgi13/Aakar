@@ -156,16 +156,15 @@
                   {{ doc.status === 'pending' ? '⏳ Pending Review' : doc.status === 'approved' ? '✅ Approved' : '❌ Rejected' }}
                 </span>
               </div>
-              <!-- Admin action buttons -->
               <div class="doc-actions">
-                <!-- Approve / Reject for pending BOQ -->
+                <!-- Approve / Reject: Admin only, pending BOQ files -->
                 <template v-if="isAdmin && doc.file_type === 'BOQ' && doc.status === 'pending'">
                   <button @click="approveDoc(doc)" class="doc-action-btn approve-btn" title="Approve">✓</button>
                   <button @click="rejectDoc(doc)" class="doc-action-btn reject-btn" title="Reject">✕</button>
                 </template>
-                <!-- Delete for rejected BOQ -->
+                <!-- Delete: ALL users see this on their rejected BOQ files -->
                 <button
-                  v-if="isAdmin && doc.file_type === 'BOQ' && doc.status === 'rejected'"
+                  v-if="doc.file_type === 'BOQ' && doc.status === 'rejected'"
                   @click="deleteDoc(doc)"
                   class="doc-action-btn delete-btn"
                   title="Remove rejected file"
@@ -498,12 +497,10 @@ const rejectDoc = async (doc) => {
   }
 };
 
-// Removes a rejected BOQ document from the list and server
 const deleteDoc = async (doc) => {
   if (!confirm(`Remove "${doc.original_name}"? This cannot be undone.`)) return;
   try {
     await axios.delete(`/documents/${doc.id}`);
-    // Remove from the local list instantly — no full reload needed
     project.value.documents = project.value.documents.filter(d => d.id !== doc.id);
   } catch (e) {
     alert("Failed to remove document.");
@@ -561,8 +558,6 @@ onMounted(fetchDetails);
 .card-title-row h3 { margin: 0; font-size: 1.1rem; color: var(--text-main); font-weight: 800; }
 .add-doc-btn { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); width: 30px; height: 30px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .add-doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
-
-/* TEAM */
 .team-list { display: flex; flex-direction: column; gap: 10px; }
 .team-member { display: flex; align-items: center; gap: 12px; background: var(--bg-input); padding: 10px; border-radius: 12px; border: 1px solid var(--border); }
 .m-avatar { width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
@@ -576,8 +571,6 @@ onMounted(fetchDetails);
 .user-checkbox input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); margin: 0; }
 .check-label { font-size: 0.95rem; color: var(--text-main); font-weight: 600; }
 .check-label small { color: var(--text-secondary); font-weight: normal; margin-left: 5px; }
-
-/* DOCUMENTS */
 .doc-list { display: flex; flex-direction: column; gap: 10px; }
 .doc-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border); transition: 0.2s; }
 .doc-item:hover { border-color: var(--primary); transform: translateX(2px); }
@@ -590,8 +583,6 @@ onMounted(fetchDetails);
 .status-pending  { background: #fef3c7; color: #92400e; }
 .status-approved { background: #d1fae5; color: #065f46; }
 .status-rejected { background: #fee2e2; color: #991b1b; }
-
-/* DOC ACTION BUTTONS */
 .doc-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .doc-action-btn { width: 28px; height: 28px; border-radius: 8px; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .approve-btn { background: #d1fae5; color: #065f46; }
@@ -600,10 +591,7 @@ onMounted(fetchDetails);
 .reject-btn:hover { background: #ef4444; color: white; }
 .delete-btn { background: #fee2e2; color: #991b1b; font-size: 1rem; }
 .delete-btn:hover { background: #ef4444; color: white; }
-
-/* BOQ UPLOAD NOTE */
 .boq-upload-note { background: #fef3c7; color: #92400e; font-size: 0.82rem; font-weight: 600; padding: 10px 14px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #fde68a; }
-
 .empty-docs { font-style: italic; color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 10px; }
 .updates-feed { background: var(--bg-surface); border-radius: 24px; border: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; box-shadow: var(--shadow-md); overflow: hidden; }
 .feed-header { padding: 20px 30px; border-bottom: 1px solid var(--border); background: var(--bg-nav); backdrop-filter: blur(10px); z-index: 10; }
