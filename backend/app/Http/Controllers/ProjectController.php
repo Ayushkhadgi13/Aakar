@@ -184,8 +184,6 @@ class ProjectController extends Controller {
         $file = $request->file('file');
         $path = $file->store('project_docs', 'public');
 
-        // BOQ files start as 'pending' so admin can review and approve/reject.
-        // All other file types are auto-approved.
         $status = $request->type === 'BOQ' ? 'pending' : 'approved';
 
         $doc = ProjectDocument::create([
@@ -221,6 +219,29 @@ class ProjectController extends Controller {
         $doc = ProjectDocument::findOrFail($id);
         $doc->update(['status' => 'rejected']);
         return response()->json(['message' => 'Document rejected.', 'document' => $doc]);
+    }
+
+    /**
+     * Admin deletes a rejected document.
+     */
+    public function deleteDocument(Request $request, $id) {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $doc = ProjectDocument::findOrFail($id);
+
+        if ($doc->status !== 'rejected') {
+            return response()->json(['message' => 'Only rejected documents can be deleted.'], 422);
+        }
+
+        // Remove the physical file from storage
+        $storagePath = str_replace('/storage/', '', $doc->file_path);
+        Storage::disk('public')->delete($storagePath);
+
+        $doc->delete();
+
+        return response()->json(['message' => 'Document deleted.']);
     }
 
     public function addUpdate(Request $request, $id) {

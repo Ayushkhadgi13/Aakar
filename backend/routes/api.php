@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Document Review (Admin Only)
     Route::patch('/documents/{id}/approve', [ProjectController::class, 'approveDocument']);
     Route::patch('/documents/{id}/reject', [ProjectController::class, 'rejectDocument']);
+    Route::delete('/documents/{id}', [ProjectController::class, 'deleteDocument']);
     
     // BOQ & Estimates
     Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']); 

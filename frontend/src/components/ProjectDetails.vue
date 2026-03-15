@@ -1,13 +1,10 @@
 <template>
   <div class="details-page">
-    <!-- Back Button -->
     <div class="nav-back" @click="$router.push('/projects')">
       <span>← Back to Projects</span>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div v-if="project" class="content-split">
-      <!-- LEFT: PROJECT INFO & ANALYTICS & DOCUMENTS -->
       <div class="info-sidebar">
         <!-- Info Card -->
         <div class="info-card">
@@ -31,7 +28,6 @@
             <p>{{ formatDate(project.start_date) }} - {{ project.end_date ? formatDate(project.end_date) : 'Ongoing' }}</p>
           </div>
 
-          <!-- PROGRESS SECTION -->
           <div class="progress-wrap">
             <div class="p-header">
               <span>Overall Completion</span>
@@ -41,11 +37,9 @@
               <div v-else-if="!isAdmin" class="no-edit">{{ project.progress }}%</div>
               <span v-else>{{ editProgressValue }}%</span>
             </div>
-
             <div v-if="!isEditingProgress" class="p-bar">
               <div class="p-fill" :style="{ width: project.progress + '%', background: 'var(--primary)' }"></div>
             </div>
-
             <div v-else class="edit-mode-ui">
               <input type="range" v-model.number="editProgressValue" min="0" max="100" class="range-slider" />
               <div class="edit-actions">
@@ -56,28 +50,27 @@
           </div>
         </div>
 
-        <!-- PROJECT TEAM SECTION -->
+        <!-- PROJECT TEAM -->
         <div class="info-card mt-20">
           <div class="card-title-row">
             <h3>Project Team</h3>
             <button v-if="isAdmin" @click="openTeamModal" class="add-doc-btn" title="Manage Team">👥</button>
           </div>
-          
           <div class="team-list">
-             <div v-if="!project.users || project.users.length === 0" class="empty-docs">
-               No team members assigned yet.
-             </div>
-             <div v-else v-for="member in project.users" :key="member.id" class="team-member">
-                <div class="m-avatar">{{ member.name.charAt(0) }}</div>
-                <div class="m-info">
-                  <span class="m-name">{{ member.name }}</span>
-                  <span class="m-role">{{ member.role.toUpperCase() }}</span>
-                </div>
-             </div>
+            <div v-if="!project.users || project.users.length === 0" class="empty-docs">
+              No team members assigned yet.
+            </div>
+            <div v-else v-for="member in project.users" :key="member.id" class="team-member">
+              <div class="m-avatar">{{ member.name.charAt(0) }}</div>
+              <div class="m-info">
+                <span class="m-name">{{ member.name }}</span>
+                <span class="m-role">{{ member.role.toUpperCase() }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- ANALYTICS CHARTS SECTION -->
+        <!-- ANALYTICS CHARTS -->
         <div class="info-card mt-20">
           <h3>Project Analytics</h3>
           <div class="charts-grid">
@@ -95,7 +88,7 @@
           </div>
         </div>
 
-        <!-- BOQ / ESTIMATES SECTION -->
+        <!-- BOQ / ESTIMATES -->
         <div class="info-card mt-20">
           <div class="card-title-row">
             <h3>Material Estimates (BOQ)</h3>
@@ -158,15 +151,25 @@
               <div class="doc-info">
                 <span class="doc-type">{{ doc.file_type }}</span>
                 <a :href="getImageUrl(doc.file_path)" target="_blank" class="doc-name">{{ doc.original_name }}</a>
-                <!-- Status badge — only shown for BOQ files -->
+                <!-- Status badge for BOQ files -->
                 <span v-if="doc.file_type === 'BOQ'" :class="['doc-status-badge', 'status-' + doc.status]">
                   {{ doc.status === 'pending' ? '⏳ Pending Review' : doc.status === 'approved' ? '✅ Approved' : '❌ Rejected' }}
                 </span>
               </div>
-              <!-- Admin approve/reject buttons — only for BOQ files that are still pending -->
-              <div v-if="isAdmin && doc.file_type === 'BOQ' && doc.status === 'pending'" class="doc-actions">
-                <button @click="approveDoc(doc)" class="doc-action-btn approve-btn" title="Approve">✓</button>
-                <button @click="rejectDoc(doc)" class="doc-action-btn reject-btn" title="Reject">✕</button>
+              <!-- Admin action buttons -->
+              <div class="doc-actions">
+                <!-- Approve / Reject for pending BOQ -->
+                <template v-if="isAdmin && doc.file_type === 'BOQ' && doc.status === 'pending'">
+                  <button @click="approveDoc(doc)" class="doc-action-btn approve-btn" title="Approve">✓</button>
+                  <button @click="rejectDoc(doc)" class="doc-action-btn reject-btn" title="Reject">✕</button>
+                </template>
+                <!-- Delete for rejected BOQ -->
+                <button
+                  v-if="isAdmin && doc.file_type === 'BOQ' && doc.status === 'rejected'"
+                  @click="deleteDoc(doc)"
+                  class="doc-action-btn delete-btn"
+                  title="Remove rejected file"
+                >🗑</button>
               </div>
             </div>
           </div>
@@ -184,7 +187,6 @@
           <div v-if="!project.updates || project.updates.length === 0" class="no-updates">
             <p>No updates posted yet.</p>
           </div>
-
           <div v-for="update in project.updates" :key="update.id" class="update-bubble">
             <div class="u-avatar">{{ update.user ? update.user.name.charAt(0) : 'U' }}</div>
             <div class="u-content">
@@ -220,12 +222,11 @@
       </div>
     </div>
 
-    <!-- ERROR VIEW -->
     <div v-else-if="errorMessage" class="empty-docs mt-20" style="font-size: 1.2rem;">
       🚨 {{ errorMessage }}
     </div>
 
-    <!-- TEAM MANAGEMENT MODAL -->
+    <!-- TEAM MODAL -->
     <div v-if="showTeamModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
@@ -297,7 +298,6 @@
               <option value="Other">Other</option>
             </select>
           </div>
-          <!-- Note shown when BOQ is selected -->
           <div v-if="docForm.type === 'BOQ'" class="boq-upload-note">
             📋 BOQ files require admin review before being marked as approved.
           </div>
@@ -334,39 +334,34 @@ const selectedFile = ref(null);
 const isPosting = ref(false);
 const zoomImage = ref(null);
 const errorMessage = ref(null);
-const isAdmin = ref(false); 
+const isAdmin = ref(false);
 
-// Editing Progress
 const isEditingProgress = ref(false);
 const editProgressValue = ref(0);
 const isSaving = ref(false);
 
-// Document Upload
 const showDocModal = ref(false);
 const isUploading = ref(false);
 const docForm = ref({ type: 'BOQ', file: null });
 
-// BOQ Logic
 const boqAnalysis = ref(null);
 const showEstimateModal = ref(false);
 const isSavingEstimate = ref(false);
 const estForm = ref({ material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null });
 
-// Team Assign Logic
 const showTeamModal = ref(false);
 const allUsers = ref([]);
 const selectedUserIds = ref([]);
 const isSavingTeam = ref(false);
 
-// --- CHARTS STATE ---
 const financialSeries = ref([]);
 const financialOptions = ref({
   chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
-  colors:['#10B981', '#EF4444'],
+  colors: ['#10B981', '#EF4444'],
   plotOptions: { bar: { borderRadius: 4, distributed: true, horizontal: false } },
   dataLabels: { enabled: false },
   xaxis: { categories: ['Estimated', 'Actual'], labels: { style: { colors: '#64748B' } } },
-  yaxis: { labels: { formatter: (val) => `Rs. ${val/1000}k` } },
+  yaxis: { labels: { formatter: (val) => `Rs. ${val / 1000}k` } },
   grid: { borderColor: '#E2E8F0' },
   legend: { show: false }
 });
@@ -374,24 +369,20 @@ const financialOptions = ref({
 const inventorySeries = ref([]);
 const inventoryOptions = ref({
   labels: ['Consumed', 'In Stock'],
-  colors:['#A65D43', '#10B981'], 
+  colors: ['#A65D43', '#10B981'],
   legend: { position: 'bottom' },
   dataLabels: { enabled: false },
   plotOptions: { pie: { donut: { size: '65%' } } }
 });
-// --------------------
 
 const fetchDetails = async () => {
   try {
     const userRes = await axios.get('/user');
     isAdmin.value = userRes.data.role === 'admin';
-
     const res = await axios.get(`/projects/${route.params.id}`);
     project.value = res.data;
-    
     await fetchBOQ();
     await fetchAnalytics();
-    
     scrollToBottom();
   } catch (e) {
     if (e.response && e.response.status === 403) {
@@ -416,9 +407,7 @@ const openTeamModal = async () => {
 const saveTeam = async () => {
   isSavingTeam.value = true;
   try {
-    const res = await axios.post(`/projects/${route.params.id}/assign`, {
-      user_ids: selectedUserIds.value
-    });
+    const res = await axios.post(`/projects/${route.params.id}/assign`, { user_ids: selectedUserIds.value });
     project.value.users = res.data.users;
     showTeamModal.value = false;
   } catch (e) {
@@ -442,11 +431,7 @@ const fetchAnalytics = async () => {
       axios.get(`/projects/${pId}/financial-variance`),
       axios.get(`/projects/${pId}/inventory`)
     ]);
-
-    financialSeries.value = [{
-      name: 'Amount', data:[finRes.data.estimated_total, finRes.data.actual_total]
-    }];
-
+    financialSeries.value = [{ name: 'Amount', data: [finRes.data.estimated_total, finRes.data.actual_total] }];
     let totalPurchased = 0; let totalUsed = 0;
     if (invRes.data.inventory && Array.isArray(invRes.data.inventory)) {
       invRes.data.inventory.forEach(item => {
@@ -454,13 +439,8 @@ const fetchAnalytics = async () => {
         totalUsed += Number(item.total_used);
       });
     }
-
     const currentStock = Math.max(0, totalPurchased - totalUsed);
-    if (totalPurchased > 0) {
-      inventorySeries.value =[totalUsed, currentStock];
-    } else {
-      inventorySeries.value =[]; 
-    }
+    inventorySeries.value = totalPurchased > 0 ? [totalUsed, currentStock] : [];
   } catch (e) {}
 };
 
@@ -470,8 +450,8 @@ const saveEstimate = async () => {
     await axios.post(`/projects/${route.params.id}/estimates`, estForm.value);
     showEstimateModal.value = false;
     estForm.value = { material_name: '', estimated_quantity: null, unit: '', estimated_unit_price: null };
-    fetchBOQ(); 
-    fetchAnalytics(); 
+    fetchBOQ();
+    fetchAnalytics();
   } catch (e) {} finally { isSavingEstimate.value = false; }
 };
 
@@ -483,7 +463,7 @@ const saveProgress = async () => {
     await axios.put(`/projects/${project.value.id}`, { progress: editProgressValue.value });
     project.value.progress = editProgressValue.value;
     isEditingProgress.value = false;
-  } catch (e) { } finally { isSaving.value = false; }
+  } catch (e) {} finally { isSaving.value = false; }
 };
 
 const handleDocFile = (e) => { docForm.value.file = e.target.files[0]; };
@@ -493,30 +473,40 @@ const uploadDoc = async () => {
   formData.append('type', docForm.value.type);
   formData.append('file', docForm.value.file);
   try {
-    await axios.post(`/projects/${project.value.id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' }});
+    await axios.post(`/projects/${project.value.id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     showDocModal.value = false;
     docForm.value = { type: 'BOQ', file: null };
     fetchDetails();
   } catch (e) { alert("Upload failed."); } finally { isUploading.value = false; }
 };
 
-// Admin approves a BOQ document
 const approveDoc = async (doc) => {
   try {
     await axios.patch(`/documents/${doc.id}/approve`);
-    doc.status = 'approved'; // Update UI instantly without full reload
+    doc.status = 'approved';
   } catch (e) {
     alert("Failed to approve document.");
   }
 };
 
-// Admin rejects a BOQ document
 const rejectDoc = async (doc) => {
   try {
     await axios.patch(`/documents/${doc.id}/reject`);
-    doc.status = 'rejected'; // Update UI instantly without full reload
+    doc.status = 'rejected';
   } catch (e) {
     alert("Failed to reject document.");
+  }
+};
+
+// Removes a rejected BOQ document from the list and server
+const deleteDoc = async (doc) => {
+  if (!confirm(`Remove "${doc.original_name}"? This cannot be undone.`)) return;
+  try {
+    await axios.delete(`/documents/${doc.id}`);
+    // Remove from the local list instantly — no full reload needed
+    project.value.documents = project.value.documents.filter(d => d.id !== doc.id);
+  } catch (e) {
+    alert("Failed to remove document.");
   }
 };
 
@@ -528,15 +518,15 @@ const postUpdate = async () => {
   if (newMessage.value) formData.append('message', newMessage.value);
   if (selectedFile.value) formData.append('image', selectedFile.value);
   try {
-    await axios.post(`/projects/${route.params.id}/updates`, formData, { headers: { 'Content-Type': 'multipart/form-data' }});
+    await axios.post(`/projects/${route.params.id}/updates`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     newMessage.value = ''; selectedFile.value = null; fetchDetails();
-  } catch (e) { } finally { isPosting.value = false; }
+  } catch (e) {} finally { isPosting.value = false; }
 };
 
 const getImageUrl = (path) => `http://127.0.0.1:8000${path}`;
 const openImage = (path) => zoomImage.value = path;
 const formatDate = (d) => new Date(d).toLocaleDateString();
-const formatTime = (d) => new Date(d).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+const formatTime = (d) => new Date(d).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 onMounted(fetchDetails);
 </script>
@@ -572,14 +562,13 @@ onMounted(fetchDetails);
 .add-doc-btn { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); width: 30px; height: 30px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .add-doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
-/* TEAM STYLES */
+/* TEAM */
 .team-list { display: flex; flex-direction: column; gap: 10px; }
 .team-member { display: flex; align-items: center; gap: 12px; background: var(--bg-input); padding: 10px; border-radius: 12px; border: 1px solid var(--border); }
 .m-avatar { width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
 .m-info { display: flex; flex-direction: column; }
 .m-name { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
 .m-role { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
-
 .modal-hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; }
 .checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 10px; margin-bottom: 20px; }
 .user-checkbox { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--bg-input); border-radius: 10px; cursor: pointer; border: 1px solid var(--border); transition: 0.2s; }
@@ -588,7 +577,7 @@ onMounted(fetchDetails);
 .check-label { font-size: 0.95rem; color: var(--text-main); font-weight: 600; }
 .check-label small { color: var(--text-secondary); font-weight: normal; margin-left: 5px; }
 
-/* DOCUMENT LIST */
+/* DOCUMENTS */
 .doc-list { display: flex; flex-direction: column; gap: 10px; }
 .doc-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border); transition: 0.2s; }
 .doc-item:hover { border-color: var(--primary); transform: translateX(2px); }
@@ -597,20 +586,20 @@ onMounted(fetchDetails);
 .doc-type { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
 .doc-name { font-size: 0.9rem; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .doc-name:hover { text-decoration: underline; }
-
-/* BOQ STATUS BADGE */
 .doc-status-badge { display: inline-block; margin-top: 4px; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; width: fit-content; }
 .status-pending  { background: #fef3c7; color: #92400e; }
 .status-approved { background: #d1fae5; color: #065f46; }
 .status-rejected { background: #fee2e2; color: #991b1b; }
 
-/* APPROVE / REJECT BUTTONS */
+/* DOC ACTION BUTTONS */
 .doc-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.doc-action-btn { width: 28px; height: 28px; border-radius: 8px; border: none; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.doc-action-btn { width: 28px; height: 28px; border-radius: 8px; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .approve-btn { background: #d1fae5; color: #065f46; }
 .approve-btn:hover { background: #10b981; color: white; }
 .reject-btn { background: #fee2e2; color: #991b1b; }
 .reject-btn:hover { background: #ef4444; color: white; }
+.delete-btn { background: #fee2e2; color: #991b1b; font-size: 1rem; }
+.delete-btn:hover { background: #ef4444; color: white; }
 
 /* BOQ UPLOAD NOTE */
 .boq-upload-note { background: #fef3c7; color: #92400e; font-size: 0.82rem; font-weight: 600; padding: 10px 14px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #fde68a; }
@@ -650,8 +639,6 @@ input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px sol
 .full-width { width: 100%; }
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 3000; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
 .lightbox img { max-height: 90vh; max-width: 90vw; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-
-/* BOQ Styles */
 .boq-summary { display: flex; gap: 20px; margin-bottom: 15px; background: var(--bg-input); padding: 15px; border-radius: 12px; border: 1px solid var(--border); }
 .boq-stat { display: flex; flex-direction: column; }
 .boq-stat label { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: var(--text-secondary); }
@@ -665,16 +652,12 @@ input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px sol
 .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .dot-red { background: var(--danger-text); }
 .dot-green { background: var(--success-text); }
-
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
-
-/* Chart Styles */
 .charts-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 15px; }
 .chart-box { background: var(--bg-input); border-radius: 16px; padding: 15px; border: 1px solid var(--border); }
 .chart-box h4 { margin: 0 0 15px 0; font-size: 0.9rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .pie-wrap { display: flex; justify-content: center; }
 .empty-chart { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 30px; font-style: italic; }
-
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 1024px) { .content-split { grid-template-columns: 1fr; } .info-sidebar { display: none; } }
