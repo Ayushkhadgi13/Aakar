@@ -76,7 +76,23 @@ class FinanceController extends Controller {
     }
 
     public function getEmployees() {
-        return response()->json(Employee::orderBy('name', 'asc')->get());
+        $currentMonth = Carbon::now()->month;
+        $currentYear = Carbon::now()->year;
+
+        $employees = Employee::orderBy('name', 'asc')->get()->map(function ($emp) use ($currentMonth, $currentYear) {
+            $descriptionPrefix = "Salary payment for " . $emp->name;
+
+            $paidThisMonth = Transaction::where('category', 'Salary')
+                ->where('description', 'LIKE', $descriptionPrefix . '%')
+                ->whereMonth('date', $currentMonth)
+                ->whereYear('date', $currentYear)
+                ->exists();
+
+            $emp->paid_this_month = $paidThisMonth;
+            return $emp;
+        });
+
+        return response()->json($employees);
     }
 
     public function storeEmployee(Request $request) {
@@ -94,7 +110,7 @@ class FinanceController extends Controller {
     }
 
     /**
-     * UPDATED: Process Salary and check for duplicates in current month
+     * Process Salary and check for duplicates in current month
      */
     public function paySalary(Request $request, $id) {
         $employee = Employee::findOrFail($id);
@@ -112,7 +128,6 @@ class FinanceController extends Controller {
             ->exists();
 
         if ($alreadyPaid) {
-            // Return 422 Unprocessable Entity status code to indicate the action cannot be performed
             return response()->json([
                 'message' => 'Salary already paid for ' . $employee->name . ' this month.'
             ], 422);

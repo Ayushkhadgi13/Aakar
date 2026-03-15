@@ -6,7 +6,6 @@
         <p>Manage project procurement and employee salaries.</p>
       </div>
       <div class="header-right">
-        <!-- Shortcuts: Only Admins can add data -->
         <div v-if="isAdmin" class="action-buttons">
           <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
           <button @click="showTransactionModal = true" class="btn primary">+ Transaction</button>
@@ -31,12 +30,13 @@
     </section>
 
     <div class="finance-grid" :class="{ 'full-width': !isAdmin }">
-      <!-- EMPLOYEE LIST (Admins Only) -->
+      <!-- EMPLOYEE PAYROLL (Admins Only) -->
       <section class="content-card" v-if="isAdmin">
         <div class="card-head">
           <h2>Employee Payroll</h2>
           <span class="badge">{{ employees.length }} Staff</span>
         </div>
+        <div class="payroll-month-label">{{ currentMonthLabel }}</div>
         <table class="data-table">
           <thead>
             <tr>
@@ -55,7 +55,8 @@
               <td>{{ emp.role }}</td>
               <td>Rs. {{ Number(emp.salary_amount).toLocaleString() }}</td>
               <td>
-                <button @click="processSalary(emp)" class="pay-btn">Pay Salary</button>
+                <span v-if="emp.paid_this_month" class="paid-badge">✓ Paid</span>
+                <button v-else @click="processSalary(emp)" class="pay-btn">Pay Salary</button>
               </td>
             </tr>
           </tbody>
@@ -72,9 +73,9 @@
           <div v-if="vendors.length === 0" style="text-align:center; color: var(--text-muted); padding: 20px;">
             No vendors registered.
           </div>
-          <div 
-            v-for="vendor in vendors" 
-            :key="vendor.id" 
+          <div
+            v-for="vendor in vendors"
+            :key="vendor.id"
             class="vendor-item clickable"
             @click="viewVendor(vendor)"
           >
@@ -89,16 +90,14 @@
       </section>
     </div>
 
-    <!-- 1. VENDOR DETAILS MODAL (POP-UP) -->
+    <!-- 1. VENDOR DETAILS MODAL -->
     <div v-if="showDetailModal && selectedVendor" class="modal-backdrop">
       <div class="modal-card wide">
         <div class="modal-header">
           <h3>Vendor Details</h3>
           <button @click="showDetailModal = false" class="close-btn">×</button>
         </div>
-        
         <div class="detail-content">
-          <!-- Basic Info -->
           <div class="vendor-profile">
             <div class="vp-row">
               <div class="vp-item">
@@ -121,8 +120,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Materials Table -->
           <h4 class="section-title">Supplied Materials</h4>
           <div class="table-responsive">
             <table class="data-table">
@@ -154,7 +151,6 @@
             </table>
           </div>
         </div>
-        
         <div class="modal-footer">
           <button @click="showDetailModal = false" class="btn secondary full-width">Close</button>
         </div>
@@ -182,7 +178,6 @@
               </select>
             </div>
           </div>
-
           <div class="form-row">
             <div class="form-group">
               <label>Contact Person</label>
@@ -193,7 +188,6 @@
               <input type="text" v-model="formV.phone" placeholder="98XXXXXXXX" />
             </div>
           </div>
-          
           <div class="material-builder">
             <label>Materials</label>
             <div v-for="(mat, idx) in formV.materials" :key="idx" class="builder-row">
@@ -204,7 +198,6 @@
             </div>
             <button type="button" @click="addMaterial" class="add-row">+ Add Item</button>
           </div>
-
           <button type="submit" class="btn-save" :disabled="isSaving">
             {{ isSaving ? 'Saving...' : 'Register Vendor' }}
           </button>
@@ -272,29 +265,38 @@ const selectedVendor = ref(null);
 const isAdmin = ref(false);
 const isSaving = ref(false);
 
+// Shows the current month/year above the payroll table — resets automatically each month
+const currentMonthLabel = ref(
+  new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
+);
+
 // Forms
-const formV = ref({ 
-  name: '', 
-  project_id: '', 
-  contact_person: '', 
-  phone: '', 
-  materials: [{ material_name: '', unit_price: '', quantity: '' }] 
+const formV = ref({
+  name: '',
+  project_id: '',
+  contact_person: '',
+  phone: '',
+  materials: [{ material_name: '', unit_price: '', quantity: '' }]
 });
 
-const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' });
+const formT = ref({
+  type: 'expense',
+  amount: '',
+  category: '',
+  date: new Date().toISOString().split('T')[0],
+  description: ''
+});
 
 const loadData = async () => {
   try {
     const userRes = await axios.get('/user');
     isAdmin.value = userRes.data.role === 'admin';
 
-    // 1. Fetch data accessible to ALL users
-    const commonReqs =[
+    const commonReqs = [
       axios.get('/finance/vendors'),
       axios.get('/projects')
     ];
 
-    // 2. Fetch data accessible ONLY to Admins
     if (isAdmin.value) {
       commonReqs.push(axios.get('/finance/summary'));
       commonReqs.push(axios.get('/finance/employees'));
@@ -337,12 +339,12 @@ const saveVendor = async () => {
   try {
     await axios.post('/finance/vendors', formV.value);
     showVendorModal.value = false;
-    formV.value = { 
-      name: '', 
-      project_id: '', 
-      contact_person: '', 
-      phone: '', 
-      materials:[{ material_name: '', unit_price: '', quantity: '' }] 
+    formV.value = {
+      name: '',
+      project_id: '',
+      contact_person: '',
+      phone: '',
+      materials: [{ material_name: '', unit_price: '', quantity: '' }]
     };
     loadData();
   } catch (e) {
@@ -357,9 +359,8 @@ const processSalary = async (emp) => {
     try {
       await axios.post(`/finance/employees/${emp.id}/pay`);
       alert("Salary payment added to expenses!");
-      loadData(); // Refresh summary data
+      loadData(); // Refresh — employee will now show as Paid
     } catch (e) {
-      // NEW: Catch the 422 error thrown by backend if already paid this month
       if (e.response && e.response.status === 422) {
         alert(e.response.data.message);
       } else {
@@ -373,7 +374,13 @@ const saveTransaction = async () => {
   try {
     await axios.post('/finance/transactions', formT.value);
     showTransactionModal.value = false;
-    formT.value = { type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' };
+    formT.value = {
+      type: 'expense',
+      amount: '',
+      category: '',
+      date: new Date().toISOString().split('T')[0],
+      description: ''
+    };
     loadData();
   } catch (e) {
     alert("Failed to save transaction.");
@@ -403,13 +410,16 @@ p { color: var(--text-secondary); margin-top: 5px; }
 
 /* GRID */
 .finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-.finance-grid.full-width { grid-template-columns: 1fr; } 
+.finance-grid.full-width { grid-template-columns: 1fr; }
 
 .content-card { background: var(--bg-surface); padding: 30px; border-radius: 24px; border: 1px solid var(--border); }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .card-head h2 { color: var(--text-main); margin: 0; font-size: 1.25rem; font-weight: 800; }
 .hint-text { font-size: 0.8rem; color: var(--text-muted); font-weight: normal; }
 .badge { background: var(--bg-input); color: var(--text-body); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+
+/* PAYROLL MONTH LABEL */
+.payroll-month-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px; }
 
 /* TABLE */
 .data-table { width: 100%; border-collapse: collapse; color: var(--text-main); }
@@ -420,20 +430,23 @@ p { color: var(--text-secondary); margin-top: 5px; }
 .text-right { text-align: right; }
 .text-center { text-align: center; }
 
+/* PAY BUTTON */
 .pay-btn { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12px; transition: 0.2s; }
 .pay-btn:hover { opacity: 0.9; }
+
+/* PAID BADGE */
+.paid-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; }
 
 /* VENDORS LIST */
 .vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 0; border-top: 1px solid var(--border); transition: 0.2s; }
 .clickable { cursor: pointer; padding: 15px; border-radius: 12px; border: 1px solid transparent; border-top: 1px solid var(--border); }
 .clickable:hover { background: var(--bg-input); border-color: var(--border); transform: translateX(5px); }
-
 .v-info h3 { margin: 0; font-size: 15px; color: var(--text-main); }
 .p-link { font-size: 12px; color: var(--primary); font-weight: 700; display: block; margin-top: 2px; }
 .v-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .v-amount { font-weight: 800; color: var(--text-main); }
 
-/* VENDOR DETAIL CONTENT */
+/* VENDOR DETAIL */
 .vendor-profile { background: var(--bg-input); padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border); }
 .vp-row { display: flex; justify-content: space-between; margin-bottom: 15px; }
 .vp-row:last-child { margin-bottom: 0; }
@@ -447,6 +460,7 @@ p { color: var(--text-secondary); margin-top: 5px; }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
 .modal-card { background: var(--bg-surface); padding: 35px; border-radius: 24px; width: 450px; border: 1px solid var(--border); box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto; }
 .wide { width: 700px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .modal-header h3 { color: var(--text-main); margin: 0; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .form-group { margin-bottom: 15px; }
