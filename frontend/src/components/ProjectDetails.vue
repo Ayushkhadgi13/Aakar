@@ -56,11 +56,10 @@
           </div>
         </div>
 
-        <!-- NEW: PROJECT TEAM SECTION -->
+        <!-- PROJECT TEAM SECTION -->
         <div class="info-card mt-20">
           <div class="card-title-row">
             <h3>Project Team</h3>
-            <!-- Manage Team Button for Admins -->
             <button v-if="isAdmin" @click="openTeamModal" class="add-doc-btn" title="Manage Team">👥</button>
           </div>
           
@@ -159,6 +158,15 @@
               <div class="doc-info">
                 <span class="doc-type">{{ doc.file_type }}</span>
                 <a :href="getImageUrl(doc.file_path)" target="_blank" class="doc-name">{{ doc.original_name }}</a>
+                <!-- Status badge — only shown for BOQ files -->
+                <span v-if="doc.file_type === 'BOQ'" :class="['doc-status-badge', 'status-' + doc.status]">
+                  {{ doc.status === 'pending' ? '⏳ Pending Review' : doc.status === 'approved' ? '✅ Approved' : '❌ Rejected' }}
+                </span>
+              </div>
+              <!-- Admin approve/reject buttons — only for BOQ files that are still pending -->
+              <div v-if="isAdmin && doc.file_type === 'BOQ' && doc.status === 'pending'" class="doc-actions">
+                <button @click="approveDoc(doc)" class="doc-action-btn approve-btn" title="Approve">✓</button>
+                <button @click="rejectDoc(doc)" class="doc-action-btn reject-btn" title="Reject">✕</button>
               </div>
             </div>
           </div>
@@ -289,6 +297,10 @@
               <option value="Other">Other</option>
             </select>
           </div>
+          <!-- Note shown when BOQ is selected -->
+          <div v-if="docForm.type === 'BOQ'" class="boq-upload-note">
+            📋 BOQ files require admin review before being marked as approved.
+          </div>
           <div class="form-group">
             <label>Select File (PDF, Excel, IMG)</label>
             <input type="file" @change="handleDocFile" required />
@@ -300,7 +312,7 @@
       </div>
     </div>
 
-    <!-- Image Modal -->
+    <!-- Image Lightbox -->
     <div v-if="zoomImage" class="lightbox" @click="zoomImage = null">
       <img :src="getImageUrl(zoomImage)" />
     </div>
@@ -392,10 +404,8 @@ const fetchDetails = async () => {
 
 const openTeamModal = async () => {
   try {
-    // Fetch all available users for assignment
     const res = await axios.get('/users-list');
     allUsers.value = res.data;
-    // Pre-select currently assigned users
     selectedUserIds.value = project.value.users.map(u => u.id);
     showTeamModal.value = true;
   } catch (e) {
@@ -409,7 +419,6 @@ const saveTeam = async () => {
     const res = await axios.post(`/projects/${route.params.id}/assign`, {
       user_ids: selectedUserIds.value
     });
-    // Update local state with the returned new assigned users array
     project.value.users = res.data.users;
     showTeamModal.value = false;
   } catch (e) {
@@ -485,8 +494,30 @@ const uploadDoc = async () => {
   formData.append('file', docForm.value.file);
   try {
     await axios.post(`/projects/${project.value.id}/documents`, formData, { headers: { 'Content-Type': 'multipart/form-data' }});
-    showDocModal.value = false; docForm.value.file = null; fetchDetails();
+    showDocModal.value = false;
+    docForm.value = { type: 'BOQ', file: null };
+    fetchDetails();
   } catch (e) { alert("Upload failed."); } finally { isUploading.value = false; }
+};
+
+// Admin approves a BOQ document
+const approveDoc = async (doc) => {
+  try {
+    await axios.patch(`/documents/${doc.id}/approve`);
+    doc.status = 'approved'; // Update UI instantly without full reload
+  } catch (e) {
+    alert("Failed to approve document.");
+  }
+};
+
+// Admin rejects a BOQ document
+const rejectDoc = async (doc) => {
+  try {
+    await axios.patch(`/documents/${doc.id}/reject`);
+    doc.status = 'rejected'; // Update UI instantly without full reload
+  } catch (e) {
+    alert("Failed to reject document.");
+  }
 };
 
 const scrollToBottom = () => { nextTick(() => { const chat = document.getElementById('chat-window'); if (chat) chat.scrollTop = chat.scrollHeight; }); };
@@ -557,14 +588,33 @@ onMounted(fetchDetails);
 .check-label { font-size: 0.95rem; color: var(--text-main); font-weight: 600; }
 .check-label small { color: var(--text-secondary); font-weight: normal; margin-left: 5px; }
 
+/* DOCUMENT LIST */
 .doc-list { display: flex; flex-direction: column; gap: 10px; }
-.doc-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border); transition: 0.2s; }
+.doc-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg-input); border-radius: 12px; border: 1px solid var(--border); transition: 0.2s; }
 .doc-item:hover { border-color: var(--primary); transform: translateX(2px); }
-.doc-icon { font-size: 1.2rem; }
-.doc-info { display: flex; flex-direction: column; overflow: hidden; }
+.doc-icon { font-size: 1.2rem; flex-shrink: 0; }
+.doc-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
 .doc-type { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
 .doc-name { font-size: 0.9rem; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .doc-name:hover { text-decoration: underline; }
+
+/* BOQ STATUS BADGE */
+.doc-status-badge { display: inline-block; margin-top: 4px; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; width: fit-content; }
+.status-pending  { background: #fef3c7; color: #92400e; }
+.status-approved { background: #d1fae5; color: #065f46; }
+.status-rejected { background: #fee2e2; color: #991b1b; }
+
+/* APPROVE / REJECT BUTTONS */
+.doc-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.doc-action-btn { width: 28px; height: 28px; border-radius: 8px; border: none; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.approve-btn { background: #d1fae5; color: #065f46; }
+.approve-btn:hover { background: #10b981; color: white; }
+.reject-btn { background: #fee2e2; color: #991b1b; }
+.reject-btn:hover { background: #ef4444; color: white; }
+
+/* BOQ UPLOAD NOTE */
+.boq-upload-note { background: #fef3c7; color: #92400e; font-size: 0.82rem; font-weight: 600; padding: 10px 14px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #fde68a; }
+
 .empty-docs { font-style: italic; color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 10px; }
 .updates-feed { background: var(--bg-surface); border-radius: 24px; border: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; box-shadow: var(--shadow-md); overflow: hidden; }
 .feed-header { padding: 20px 30px; border-bottom: 1px solid var(--border); background: var(--bg-nav); backdrop-filter: blur(10px); z-index: 10; }

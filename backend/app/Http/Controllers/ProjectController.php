@@ -38,43 +38,21 @@ class ProjectController extends Controller {
         $user = $request->user();
         $project = Project::with(['updates.user', 'documents', 'estimates', 'users'])->findOrFail($id);
 
-        if ($user->role !== 'admin' && !$project->users->contains('id', $user->id)) {
-            return response()->json(['message' => 'Unauthorized access to this project.'], 403);
+        if ($user->role !== 'admin' && !$project->users->contains($user->id)) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
+
         return response()->json($project);
     }
 
     public function store(StoreProjectRequest $request) {
-        try {
-            $project = Project::create($request->validated());
-            return response()->json($project, 201);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Internal Server Error.', 'error' => $e->getMessage()], 500);
-        }
+        $project = Project::create($request->validated());
+        return response()->json($project, 201);
     }
 
-    /**
-     * Update project. Handles auto-completion logic.
-     */
     public function update(Request $request, $id) {
         $project = Project::findOrFail($id);
-        
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'client_name' => 'sometimes|string|max:255',
-            'location' => 'nullable|string|max:255',
-            'budget' => 'sometimes|numeric|gt:0',
-            'start_date' => 'sometimes|date',
-            'progress' => 'sometimes|integer|min:0|max:100',
-            'status' => 'sometimes|in:Upcoming,In Progress,On Hold,Completed',
-        ]);
-
-        // AUTOMATION: If progress is 100, set status to Completed
-        if (isset($validated['progress']) && $validated['progress'] == 100) {
-            $validated['status'] = 'Completed';
-        }
-        
-        $project->update($validated);
+        $project->update($request->only(['name', 'client_name', 'location', 'budget', 'start_date', 'end_date', 'status', 'progress']));
         return response()->json($project);
     }
 
@@ -82,76 +60,50 @@ class ProjectController extends Controller {
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        $project = Project::findOrFail($id);
-        $project->delete();
-        return response()->json(['message' => 'Project deleted successfully']);
+        Project::findOrFail($id)->delete();
+        return response()->json(['message' => 'Project deleted']);
     }
 
     public function assignUsers(Request $request, $id) {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized. Only admins can assign.'], 403);
-        }
-        $request->validate(['user_ids' => 'array', 'user_ids.*' => 'exists:users,id']);
         $project = Project::findOrFail($id);
-        $project->users()->sync($request->user_ids); 
-        return response()->json(['message' => 'Team updated successfully.', 'users' => $project->users]);
+        $project->users()->sync($request->user_ids);
+        return response()->json(['message' => 'Team updated', 'users' => $project->users]);
     }
 
     public function storeEstimates(Request $request, $id) {
-        if ($request->has('estimates') && is_array($request->estimates)) {
-            $request->validate([
-                'estimates' => 'required|array|min:1',
-                'estimates.*.material_name' => 'required|string',
-                'estimates.*.estimated_quantity' => 'required|integer|min:1',
-                'estimates.*.estimated_unit_price' => 'required|numeric|min:0',
-                'estimates.*.unit' => 'required|string'
-            ]);
-            $now = now();
-            $estimatesData = [];
-            foreach ($request->estimates as $est) {
-                $estimatesData[] = [
-                    'project_id' => $id,
-                    'material_name' => $est['material_name'],
-                    'estimated_quantity' => $est['estimated_quantity'],
-                    'estimated_unit_price' => $est['estimated_unit_price'],
-                    'unit' => $est['unit'],
-                    'created_at' => $now,
-                    'updated_at' => $now
-                ];
-            }
-            ProjectMaterialEstimate::insert($estimatesData);
-            return response()->json(['message' => count($estimatesData) . ' estimates successfully saved.', 'bulk' => true], 201);
-        }
-        $request->validate([
+        $validated = $request->validate([
             'material_name' => 'required|string',
-            'estimated_quantity' => 'required|integer|min:1',
+            'estimated_quantity' => 'required|numeric|min:0',
             'estimated_unit_price' => 'required|numeric|min:0',
-            'unit' => 'required|string'
+            'unit' => 'required|string',
         ]);
-        $estimate = ProjectMaterialEstimate::create([
-            'project_id' => $id,
-            'material_name' => $request->material_name,
-            'estimated_quantity' => $request->estimated_quantity,
-            'estimated_unit_price' => $request->estimated_unit_price,
-            'unit' => $request->unit
-        ]);
+        $estimate = ProjectMaterialEstimate::create(array_merge($validated, ['project_id' => $id]));
         return response()->json($estimate, 201);
     }
 
     public function getBOQAnalysis($id) {
         $project = Project::findOrFail($id);
         $estimates = ProjectMaterialEstimate::where('project_id', $id)->get();
-        $actuals = VendorMaterial::whereHas('vendor', function($q) use ($id) {
-            $q->where('project_id', $id);
-        })->select('material_name', DB::raw('SUM(quantity) as total_quantity'), DB::raw('SUM(total_price) as total_cost'), DB::raw('AVG(unit_price) as avg_unit_price'))
-        ->groupBy('material_name')->get()->keyBy('material_name'); 
 
-        $analysis = $estimates->map(function($est) use ($actuals) {
-            $actual = $actuals->get($est->material_name); 
-            $estTotalCost = $est->estimated_quantity * $est->estimated_unit_price;
-            $actQuantity = $actual ? $actual->total_quantity : 0;
-            $actTotalCost = $actual ? $actual->total_cost : 0;
-            return[
+        $actuals = VendorMaterial::whereHas('vendor', function ($q) use ($id) {
+            $q->where('project_id', $id);
+        })
+        ->select('material_name',
+            DB::raw('SUM(quantity) as total_quantity'),
+            DB::raw('SUM(total_price) as total_cost'),
+            DB::raw('AVG(unit_price) as avg_unit_price')
+        )
+        ->groupBy('material_name')
+        ->get()
+        ->keyBy('material_name');
+
+        $analysis = $estimates->map(function ($est) use ($actuals) {
+            $actual = $actuals->get($est->material_name);
+            $actQuantity = $actual ? (float)$actual->total_quantity : 0;
+            $actTotalCost = $actual ? (float)$actual->total_cost : 0;
+            $estTotalCost = (float)$est->estimated_quantity * (float)$est->estimated_unit_price;
+
+            return [
                 'material' => $est->material_name,
                 'unit' => $est->unit,
                 'est_qty' => $est->estimated_quantity,
@@ -224,11 +176,51 @@ class ProjectController extends Controller {
     }
 
     public function uploadDocument(Request $request, $id) {
-        $request->validate(['file' => 'required|file|max:20480', 'type' => 'required|string|in:BOQ,Drawing,Pre-Estimation,Other']);
+        $request->validate([
+            'file' => 'required|file|max:20480',
+            'type' => 'required|string|in:BOQ,Drawing,Pre-Estimation,Other'
+        ]);
+
         $file = $request->file('file');
         $path = $file->store('project_docs', 'public');
-        $doc = ProjectDocument::create(['project_id' => $id, 'file_type' => $request->type, 'original_name' => $file->getClientOriginalName(), 'file_path' => '/storage/' . $path]);
+
+        // BOQ files start as 'pending' so admin can review and approve/reject.
+        // All other file types are auto-approved.
+        $status = $request->type === 'BOQ' ? 'pending' : 'approved';
+
+        $doc = ProjectDocument::create([
+            'project_id' => $id,
+            'file_type' => $request->type,
+            'original_name' => $file->getClientOriginalName(),
+            'file_path' => '/storage/' . $path,
+            'status' => $status,
+        ]);
+
         return response()->json($doc);
+    }
+
+    /**
+     * Admin approves a BOQ document.
+     */
+    public function approveDocument(Request $request, $id) {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $doc = ProjectDocument::findOrFail($id);
+        $doc->update(['status' => 'approved']);
+        return response()->json(['message' => 'Document approved.', 'document' => $doc]);
+    }
+
+    /**
+     * Admin rejects a BOQ document.
+     */
+    public function rejectDocument(Request $request, $id) {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $doc = ProjectDocument::findOrFail($id);
+        $doc->update(['status' => 'rejected']);
+        return response()->json(['message' => 'Document rejected.', 'document' => $doc]);
     }
 
     public function addUpdate(Request $request, $id) {
@@ -240,7 +232,12 @@ class ProjectController extends Controller {
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('project_updates', 'public');
         }
-        $update = ProjectUpdate::create(['project_id' => $id, 'user_id' => $request->user()->id, 'message' => $request->message, 'image_path' => $imagePath ? '/storage/' . $imagePath : null]);
+        $update = ProjectUpdate::create([
+            'project_id' => $id,
+            'user_id' => $request->user()->id,
+            'message' => $request->message,
+            'image_path' => $imagePath ? '/storage/' . $imagePath : null
+        ]);
         return response()->json($update->load('user'));
     }
 }
