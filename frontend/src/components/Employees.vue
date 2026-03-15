@@ -86,8 +86,10 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { useAuth } from '../useAuth';
 
 const router = useRouter();
+const { isAdmin, loadUser } = useAuth();
 const users = ref([]);
 const showModal = ref(false);
 const isSaving = ref(false);
@@ -95,13 +97,13 @@ const form = ref({ name: '', email: '', dob: '', role: 'user', salary: null });
 
 const fetchUsers = async () => {
   try {
-    const userRes = await axios.get('/user');
-    // SECURITY CHECK
-    if (userRes.data.role !== 'admin') {
+    // Cached — won't re-fetch /user if already loaded
+    await loadUser();
+    // Guard: redirect non-admins away
+    if (!isAdmin.value) {
       router.push('/dashboard');
       return;
     }
-
     const res = await axios.get('/system/employees');
     users.value = res.data.users;
   } catch (e) {

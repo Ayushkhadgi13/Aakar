@@ -129,94 +129,52 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { useAuth } from '../useAuth';
 
 const router = useRouter();
+const { isAdmin, loadUser } = useAuth();
+
 const projects = ref([]);
+const loading = ref(true);
 const searchQuery = ref('');
 const showModal = ref(false);
-const loading = ref(false);
-const isSaving = ref(false);
-const isAdmin = ref(false);
-
-// Dropdown & Edit State
-const activeDropdown = ref(null);
 const isEditing = ref(false);
 const editId = ref(null);
+const activeDropdown = ref(null);
 
-const initialForm = {
-  name: '', 
-  client_name: '', 
-  location: '', 
-  budget: null,
-  status: 'In Progress', 
-  start_date: new Date().toISOString().split('T')[0],
-  progress: 0
-};
-
-const form = ref({ ...initialForm });
-
-// Close dropdown if clicked outside
-const closeDropdown = () => {
-  activeDropdown.value = null;
-};
-
-const toggleDropdown = (id) => {
-  activeDropdown.value = activeDropdown.value === id ? null : id;
-};
-
-const openCreateModal = () => {
-  isEditing.value = false;
-  editId.value = null;
-  form.value = { ...initialForm };
-  showModal.value = true;
-};
-
-const openEditModal = (project) => {
-  activeDropdown.value = null; // close menu
-  isEditing.value = true;
-  editId.value = project.id;
-  form.value = { 
-    name: project.name,
-    client_name: project.client_name,
-    location: project.location,
-    budget: project.budget,
-    status: project.status,
-    start_date: project.start_date,
-    progress: project.progress
-  };
-  showModal.value = true;
-};
-
-const closeModal = () => {
-    showModal.value = false;
-    form.value = { ...initialForm };
-};
+const form = ref({ name: '', client_name: '', location: '', budget: '', start_date: '', end_date: '', status: 'Upcoming' });
 
 const fetchProjects = async () => {
-  loading.value = true;
   try {
-    const userRes = await axios.get('/user');
-    isAdmin.value = userRes.data.role === 'admin';
-
     const res = await axios.get('/projects', { params: { search: searchQuery.value } });
     projects.value = res.data;
   } catch (e) {
-    console.error("Fetch Error:", e);
+    console.error(e);
   } finally {
     loading.value = false;
   }
 };
 
-const saveProject = async () => {
-  if (form.value.budget <= 0) {
-    alert("Project budget must be greater than 0.");
-    return;
-  }
+const openCreateModal = () => {
+  isEditing.value = false;
+  form.value = { name: '', client_name: '', location: '', budget: '', start_date: '', end_date: '', status: 'Upcoming' };
+  showModal.value = true;
+};
 
-  isSaving.value = true;
+const openEditModal = (project) => {
+  isEditing.value = true;
+  editId.value = project.id;
+  form.value = { name: project.name, client_name: project.client_name, location: project.location, budget: project.budget, start_date: project.start_date, end_date: project.end_date, status: project.status };
+  showModal.value = true;
+  activeDropdown.value = null;
+};
+
+const closeModal = () => { showModal.value = false; };
+
+const saveProject = async () => {
   try {
     if (isEditing.value) {
       await axios.put(`/projects/${editId.value}`, form.value);
@@ -225,42 +183,27 @@ const saveProject = async () => {
     }
     closeModal();
     fetchProjects();
-  } catch (e) {
-    alert("Error saving project: " + (e.response?.data?.message || "Check fields"));
-  } finally {
-    isSaving.value = false;
-  }
+  } catch (e) { alert("Failed to save project."); }
 };
 
 const deleteProject = async (id) => {
-  activeDropdown.value = null; // close menu
-  if (confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
-    try {
-      await axios.delete(`/projects/${id}`);
-      fetchProjects();
-    } catch (e) {
-      alert("Failed to delete project.");
-    }
+  if (confirm('Delete this project?')) {
+    try { await axios.delete(`/projects/${id}`); fetchProjects(); }
+    catch (e) { alert("Failed to delete."); }
   }
+  activeDropdown.value = null;
 };
 
-const goToDetails = (id) => {
-  router.push(`/projects/${id}`);
-};
+const goToDetails = (id) => router.push(`/projects/${id}`);
+const toggleDropdown = (id) => { activeDropdown.value = activeDropdown.value === id ? null : id; };
+const getProgressColor = (p) => p >= 75 ? '#10B981' : p >= 40 ? '#F59E0B' : '#EF4444';
 
-const getProgressColor = (p) => {
-  if (p < 30) return '#ef4444';
-  if (p < 70) return '#f59e0b';
-  return '#10b981';
-};
-
-onMounted(() => {
+onMounted(async () => {
+  // Ensure user is loaded (cached)
+  await loadUser();
   fetchProjects();
-  document.addEventListener('click', closeDropdown);
-});
 
-onUnmounted(() => {
-  document.removeEventListener('click', closeDropdown);
+  document.addEventListener('click', () => { activeDropdown.value = null; });
 });
 </script>
 

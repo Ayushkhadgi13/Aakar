@@ -248,49 +248,28 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import { useRouter } from 'vue-router';
+import { useAuth } from '../useAuth';
 
-const router = useRouter();
+const { isAdmin, loadUser } = useAuth();
 const summary = ref({});
 const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
-
-// Modal States
 const showVendorModal = ref(false);
 const showTransactionModal = ref(false);
 const showDetailModal = ref(false);
 const selectedVendor = ref(null);
-
-const isAdmin = ref(false);
 const isSaving = ref(false);
-
-// Shows the current month/year above the payroll table — resets automatically each month
 const currentMonthLabel = ref(
   new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
 );
-
-// Forms
-const formV = ref({
-  name: '',
-  project_id: '',
-  contact_person: '',
-  phone: '',
-  materials: [{ material_name: '', unit_price: '', quantity: '' }]
-});
-
-const formT = ref({
-  type: 'expense',
-  amount: '',
-  category: '',
-  date: new Date().toISOString().split('T')[0],
-  description: ''
-});
+const formV = ref({ name: '', project_id: '', contact_person: '', phone: '', materials: [{ material_name: '', unit_price: '', quantity: '' }] });
+const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' });
 
 const loadData = async () => {
   try {
-    const userRes = await axios.get('/user');
-    isAdmin.value = userRes.data.role === 'admin';
+    // Ensure user is loaded (cached — no extra network call if already done)
+    await loadUser();
 
     const commonReqs = [
       axios.get('/finance/vendors'),
@@ -303,7 +282,6 @@ const loadData = async () => {
     }
 
     const responses = await Promise.all(commonReqs);
-
     vendors.value = responses[0].data;
     projects.value = responses[1].data;
 
@@ -311,27 +289,16 @@ const loadData = async () => {
       summary.value = responses[2].data;
       employees.value = responses[3].data;
     }
-
   } catch (e) {
     console.error("Data load failed", e);
   }
 };
 
-const viewVendor = (vendor) => {
-  selectedVendor.value = vendor;
-  showDetailModal.value = true;
-};
-
-const addMaterial = () => {
-  formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' });
-};
-
+const viewVendor = (vendor) => { selectedVendor.value = vendor; showDetailModal.value = true; };
+const addMaterial = () => { formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' }); };
 const removeMaterial = (idx) => {
-  if (formV.value.materials.length > 1) {
-    formV.value.materials.splice(idx, 1);
-  } else {
-    alert("At least one material is required.");
-  }
+  if (formV.value.materials.length > 1) { formV.value.materials.splice(idx, 1); }
+  else { alert("At least one material is required."); }
 };
 
 const saveVendor = async () => {
@@ -339,19 +306,10 @@ const saveVendor = async () => {
   try {
     await axios.post('/finance/vendors', formV.value);
     showVendorModal.value = false;
-    formV.value = {
-      name: '',
-      project_id: '',
-      contact_person: '',
-      phone: '',
-      materials: [{ material_name: '', unit_price: '', quantity: '' }]
-    };
+    formV.value = { name: '', project_id: '', contact_person: '', phone: '', materials: [{ material_name: '', unit_price: '', quantity: '' }] };
     loadData();
-  } catch (e) {
-    alert("Failed to save vendor. Please check all fields.");
-  } finally {
-    isSaving.value = false;
-  }
+  } catch (e) { alert("Failed to save vendor. Please check all fields."); }
+  finally { isSaving.value = false; }
 };
 
 const processSalary = async (emp) => {
@@ -359,13 +317,10 @@ const processSalary = async (emp) => {
     try {
       await axios.post(`/finance/employees/${emp.id}/pay`);
       alert("Salary payment added to expenses!");
-      loadData(); // Refresh — employee will now show as Paid
+      loadData();
     } catch (e) {
-      if (e.response && e.response.status === 422) {
-        alert(e.response.data.message);
-      } else {
-        alert("Failed to process salary payment.");
-      }
+      if (e.response && e.response.status === 422) { alert(e.response.data.message); }
+      else { alert("Failed to process salary payment."); }
     }
   }
 };
@@ -374,17 +329,9 @@ const saveTransaction = async () => {
   try {
     await axios.post('/finance/transactions', formT.value);
     showTransactionModal.value = false;
-    formT.value = {
-      type: 'expense',
-      amount: '',
-      category: '',
-      date: new Date().toISOString().split('T')[0],
-      description: ''
-    };
+    formT.value = { type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' };
     loadData();
-  } catch (e) {
-    alert("Failed to save transaction.");
-  }
+  } catch (e) { alert("Failed to save transaction."); }
 };
 
 const calculateVendorTotal = (mats) => mats?.reduce((acc, m) => acc + parseFloat(m.total_price || 0), 0) || 0;

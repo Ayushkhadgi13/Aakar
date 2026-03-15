@@ -108,26 +108,22 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { useAuth } from '../useAuth';
 
+const { isAdmin, loadUser } = useAuth();
 const myTasks = ref([]);
 const assignedByMe = ref([]);
 const users = ref([]);
 const showTaskModal = ref(false);
-const isAdmin = ref(false); // Default to false, check on load
-
 const form = ref({ title: '', description: '', assigned_to: '', due_date: '' });
 
 const loadPageData = async () => {
   try {
-    // 1. Check User Role directly from API to ensure security
-    const userRes = await axios.get('/user');
-    isAdmin.value = userRes.data.role === 'admin';
-
-    // 2. Fetch Tasks
+    // Cached — no extra network call if user already loaded
+    await loadUser();
     const taskRes = await axios.get('/tasks');
     myTasks.value = taskRes.data.my_tasks;
     assignedByMe.value = taskRes.data.assigned_by_me || [];
-
   } catch (e) {
     console.error("Failed to load task data", e);
   }
@@ -151,18 +147,14 @@ const saveTask = async () => {
     await axios.post('/tasks', form.value);
     showTaskModal.value = false;
     form.value = { title: '', description: '', assigned_to: '', due_date: '' };
-    loadPageData(); // Refresh list
-  } catch (e) {
-    alert("Failed to assign task");
-  }
+    loadPageData();
+  } catch (e) { alert("Failed to assign task"); }
 };
 
 const updateStatus = async (task) => {
   try {
     await axios.put(`/tasks/${task.id}`, { status: task.status });
-  } catch (e) {
-    alert("Update failed");
-  }
+  } catch (e) { alert("Update failed"); }
 };
 
 const formatDate = (d) => new Date(d).toLocaleDateString();

@@ -1,28 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Login from './components/Login.vue'
-// Register component technically exists but we hide link. 
-// import Register from './components/Register.vue' 
-import Dashboard from './components/Dashboard.vue'
-import Finance from './components/Finance.vue'
-import Projects from './components/Projects.vue'
-import ProjectDetails from './components/ProjectDetails.vue'
-import Tasks from './components/Tasks.vue'
-import Employees from './components/Employees.vue' // Import New Component
 
 const routes = [
   { path: '/', redirect: '/login' },
-  { path: '/login', component: Login },
-  // { path: '/register', component: Register }, // Optionally disable route
-  { 
-    path: '/dashboard', 
-    component: Dashboard, 
+  {
+    path: '/login',
+    component: () => import('./components/Login.vue')
+  },
+  {
+    path: '/dashboard',
+    component: () => import('./components/Dashboard.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: '/finance', component: Finance },
-      { path: '/projects', component: Projects },
-      { path: '/projects/:id', component: ProjectDetails },
-      { path: '/tasks', component: Tasks },
-      { path: '/employees', component: Employees } // New Route
+      { path: '/finance',         component: () => import('./components/Finance.vue') },
+      { path: '/projects',        component: () => import('./components/Projects.vue') },
+      { path: '/projects/:id',    component: () => import('./components/ProjectDetails.vue') },
+      { path: '/tasks',           component: () => import('./components/Tasks.vue') },
+      { path: '/employees',       component: () => import('./components/Employees.vue') },
     ]
   }
 ]
@@ -33,12 +26,12 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const loggedIn = localStorage.getItem('token');
+  const loggedIn = localStorage.getItem('token')
   if (to.matched.some(record => record.meta.requiresAuth) && !loggedIn) {
-    next('/login');
+    next('/login')
   } else {
-    next();
+    next()
   }
-});
+})
 
 export default router
