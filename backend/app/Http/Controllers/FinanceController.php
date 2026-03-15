@@ -7,12 +7,13 @@ use App\Models\Transaction;
 use App\Models\Vendor;
 use App\Models\Employee;
 use App\Models\VendorMaterial;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Http\Requests\StoreTransactionRequest;
+use App\Notifications\SalaryPaid;
 
 class FinanceController extends Controller {
-    
 
     public function getSummary() {
         $income = (float) Transaction::where('type', 'income')->sum('amount');
@@ -59,7 +60,7 @@ class FinanceController extends Controller {
         $vendor = Vendor::create([
             'name' => $data['name'],
             'project_id' => $data['project_id'],
-            'contact_person' => $request->input('contact_person'), 
+            'contact_person' => $request->input('contact_person'),
             'phone' => $request->input('phone')
         ]);
 
@@ -109,18 +110,15 @@ class FinanceController extends Controller {
         return response()->json(Employee::create($data));
     }
 
-    /**
-     * Process Salary and check for duplicates in current month
-     */
     public function paySalary(Request $request, $id) {
         $employee = Employee::findOrFail($id);
         
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
+        $monthLabel = Carbon::now()->format('F Y');
         
         $descriptionPrefix = "Salary payment for " . $employee->name;
 
-        // Check if a salary transaction already exists for this employee this month
         $alreadyPaid = Transaction::where('category', 'Salary')
             ->where('description', 'LIKE', $descriptionPrefix . '%')
             ->whereMonth('date', $currentMonth)
@@ -138,8 +136,14 @@ class FinanceController extends Controller {
             'amount' => $employee->salary_amount,
             'category' => 'Salary',
             'date' => Carbon::now()->toDateString(),
-            'description' => $descriptionPrefix . " - " . Carbon::now()->format('F Y'),
+            'description' => $descriptionPrefix . " - " . $monthLabel,
         ]);
+
+        // Notify the matching user account (matched by name) about their salary payment
+        $user = User::where('name', $employee->name)->first();
+        if ($user) {
+            $user->notify(new SalaryPaid((float) $employee->salary_amount, $monthLabel));
+        }
 
         return response()->json(['message' => 'Salary processed successfully', 'transaction' => $transaction]);
     }

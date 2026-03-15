@@ -8,10 +8,14 @@ use App\Models\ProjectUpdate;
 use App\Models\ProjectDocument;
 use App\Models\ProjectMaterialEstimate;
 use App\Models\VendorMaterial;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
-use App\Http\Requests\StoreProjectRequest; 
+use Illuminate\Support\Facades\Notification;
+use App\Http\Requests\StoreProjectRequest;
+use App\Notifications\BOQUploaded;
+use App\Notifications\BOQReviewed;
 
 class ProjectController extends Controller {
     
@@ -112,8 +116,8 @@ class ProjectController extends Controller {
                 'act_qty' => $actQuantity,
                 'act_rate' => $actual ? round($actual->avg_unit_price, 2) : 0,
                 'act_total' => $actTotalCost,
-                'qty_variance' => $est->estimated_quantity - $actQuantity, 
-                'cost_variance' => $estTotalCost - $actTotalCost, 
+                'qty_variance' => $est->estimated_quantity - $actQuantity,
+                'cost_variance' => $estTotalCost - $actTotalCost,
                 'status' => ($actTotalCost > $estTotalCost) ? 'Over Budget' : 'Within Budget'
             ];
         });
@@ -121,7 +125,7 @@ class ProjectController extends Controller {
         foreach ($actuals as $name => $data) {
             if (!$estimates->contains('material_name', $name)) {
                 $analysis->push([
-                    'material' => $name, 'unit' => 'N/A', 
+                    'material' => $name, 'unit' => 'N/A',
                     'est_qty' => 0, 'est_rate' => 0, 'est_total' => 0,
                     'act_qty' => $data->total_quantity,
                     'act_rate' => round($data->avg_unit_price, 2),
@@ -195,11 +199,17 @@ class ProjectController extends Controller {
             'status' => $status,
         ]);
 
+        // Notify all admins when a BOQ file is uploaded for review
+        if ($request->type === 'BOQ') {
+            $admins = User::where('role', 'admin')->get();
+            Notification::send($admins, new BOQUploaded($doc, $request->user()->name));
+        }
+
         return response()->json($doc);
     }
 
     /**
-     * Admin approves a BOQ document.
+     * Admin approves a BOQ document — notifies all project team members.
      */
     public function approveDocument(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
@@ -207,11 +217,16 @@ class ProjectController extends Controller {
         }
         $doc = ProjectDocument::findOrFail($id);
         $doc->update(['status' => 'approved']);
+
+        // Notify all team members on this project
+        $project = Project::with('users')->findOrFail($doc->project_id);
+        Notification::send($project->users, new BOQReviewed($doc, 'approved'));
+
         return response()->json(['message' => 'Document approved.', 'document' => $doc]);
     }
 
     /**
-     * Admin rejects a BOQ document.
+     * Admin rejects a BOQ document — notifies all project team members.
      */
     public function rejectDocument(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
@@ -219,23 +234,25 @@ class ProjectController extends Controller {
         }
         $doc = ProjectDocument::findOrFail($id);
         $doc->update(['status' => 'rejected']);
+
+        // Notify all team members on this project
+        $project = Project::with('users')->findOrFail($doc->project_id);
+        Notification::send($project->users, new BOQReviewed($doc, 'rejected'));
+
         return response()->json(['message' => 'Document rejected.', 'document' => $doc]);
     }
 
     /**
      * Any team member (or admin) can delete a rejected BOQ document.
-     * Regular users must belong to the project the document is attached to.
      */
     public function deleteDocument(Request $request, $id) {
         $doc = ProjectDocument::findOrFail($id);
         $user = $request->user();
 
-        // Only rejected documents can be removed
         if ($doc->status !== 'rejected') {
             return response()->json(['message' => 'Only rejected documents can be deleted.'], 422);
         }
 
-        // Non-admins must be a member of the project this document belongs to
         if ($user->role !== 'admin') {
             $isMember = $user->projects()->where('projects.id', $doc->project_id)->exists();
             if (!$isMember) {
@@ -243,10 +260,8 @@ class ProjectController extends Controller {
             }
         }
 
-        // Remove the physical file from storage
         $storagePath = str_replace('/storage/', '', $doc->file_path);
         Storage::disk('public')->delete($storagePath);
-
         $doc->delete();
 
         return response()->json(['message' => 'Document deleted.']);

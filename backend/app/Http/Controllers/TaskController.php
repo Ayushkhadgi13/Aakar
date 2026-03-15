@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\Project; 
+use App\Models\Project;
 use Illuminate\Support\Facades\Auth;
+use App\Notifications\TaskAssigned;
+use App\Notifications\TaskCompleted;
 
 class TaskController extends Controller
 {
-    // Get tasks for the logged-in user
     public function index(Request $request)
     {
         $user = $request->user();
         
-        // If admin, show tasks they created AND tasks assigned to them
         if ($user->role === 'admin') {
             return response()->json([
                 'my_tasks' => Task::with('creator')->where('assigned_to', $user->id)->orderBy('due_date')->get(),
@@ -23,14 +23,12 @@ class TaskController extends Controller
             ]);
         }
 
-        // Regular users only see tasks assigned to them
         return response()->json([
             'my_tasks' => Task::with('creator')->where('assigned_to', $user->id)->orderBy('due_date')->get(),
             'assigned_by_me' => []
         ]);
     }
 
-    // NEW: User Stats for Employee Dashboard
     public function userStats(Request $request) {
         $userId = $request->user()->id;
 
@@ -47,14 +45,11 @@ class TaskController extends Controller
         ]);
     }
 
-    // Get list of users for dropdown (Admin only)
     public function getUsers(Request $request)
     {
-        // Allow all users to see the list for tagging, or restrict to admin if preferred
         return response()->json(User::select('id', 'name', 'email', 'role')->get());
     }
 
-    // Create a new task (Admin only)
     public function store(Request $request)
     {
         if ($request->user()->role !== 'admin') {
@@ -77,15 +72,19 @@ class TaskController extends Controller
             'status' => 'Pending'
         ]);
 
+        // Notify the assignee about their new task
+        $assignee = User::find($data['assigned_to']);
+        if ($assignee) {
+            $assignee->notify(new TaskAssigned($task, $request->user()->name));
+        }
+
         return response()->json($task->load('assignee'));
     }
 
-    // Update task status (Assignee or Admin)
     public function update(Request $request, $id)
     {
         $task = Task::findOrFail($id);
-        
-        // Allow assignee or creator (admin) to update status
+
         if ($request->user()->id !== $task->assigned_to && $request->user()->id !== $task->assigned_by) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -94,7 +93,16 @@ class TaskController extends Controller
             'status' => 'required|in:Pending,In Progress,Completed'
         ]);
 
+        $previousStatus = $task->status;
         $task->update(['status' => $data['status']]);
+
+        // Notify the admin who assigned the task when it gets completed
+        if ($data['status'] === 'Completed' && $previousStatus !== 'Completed') {
+            $assigner = User::find($task->assigned_by);
+            if ($assigner) {
+                $assigner->notify(new TaskCompleted($task, $request->user()->name));
+            }
+        }
 
         return response()->json($task);
     }

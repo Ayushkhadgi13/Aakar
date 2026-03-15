@@ -18,12 +18,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) { return $request->user(); });
 
+    // Notification Routes
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+
     // Finance Routes
     Route::get('/finance/summary', [FinanceController::class, 'getSummary']);
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
     Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
-    
+
     // Payroll Routes
     Route::get('/finance/employees', [FinanceController::class, 'getEmployees']);
     Route::post('/finance/employees', [FinanceController::class, 'storeEmployee']);
@@ -40,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/projects/{id}', [ProjectController::class, 'update']);
     Route::delete('/projects/{id}', [ProjectController::class, 'destroy']);
     Route::post('/projects/{id}/assign', [ProjectController::class, 'assignUsers']);
-    
+
     // Project Specifics
     Route::post('/projects/{id}/updates', [ProjectController::class, 'addUpdate']);
     Route::post('/projects/{id}/documents', [ProjectController::class, 'uploadDocument']);
@@ -49,10 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/documents/{id}/approve', [ProjectController::class, 'approveDocument']);
     Route::patch('/documents/{id}/reject', [ProjectController::class, 'rejectDocument']);
     Route::delete('/documents/{id}', [ProjectController::class, 'deleteDocument']);
-    
+
     // BOQ & Estimates
-    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']); 
-    Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']); 
+    Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']);
+    Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']);
     Route::get('/projects/{id}/financial-variance', [ProjectController::class, 'getFinancialVariance']);
 
     // Material Routes
@@ -61,13 +66,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Task Routes
     Route::get('/tasks', [TaskController::class, 'index']);
-    Route::get('/tasks/stats', [TaskController::class, 'userStats']); 
-    Route::get('/users-list', [TaskController::class, 'getUsers']); 
+    Route::get('/tasks/stats', [TaskController::class, 'userStats']);
+    Route::get('/users-list', [TaskController::class, 'getUsers']);
     Route::post('/tasks', [TaskController::class, 'store']);
     Route::put('/tasks/{id}', [TaskController::class, 'update']);
-
-    // Notification Routes
-    Route::get('/notifications', [NotificationController::class, 'index']);
-    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
-    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 });
