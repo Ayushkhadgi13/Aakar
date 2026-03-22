@@ -19,14 +19,26 @@ class FinanceController extends Controller {
         $query = Transaction::query();
         $matQuery = VendorMaterial::query();
 
-        // 1. FILTER LOGIC: Restrict to exact dates if user specifies them
+        // ------------------------------------------------------------------
+        // 1. ALL-TIME NET BALANCE (Unaffected by date filters, cannot be < 0)
+        // ------------------------------------------------------------------
+        $allTimeIncome = (float) Transaction::where('type', 'income')->sum('amount');
+        $allTimeExpense = (float) Transaction::where('type', 'expense')->sum('amount');
+        $allTimePrepayment = (float) Transaction::where('type', 'pre-payment')->sum('amount');
+        
+        // max(0, ...) ensures the balance never displays as a negative number
+        $netBalance = max(0, $allTimeIncome - $allTimeExpense - $allTimePrepayment);
+
+        // ------------------------------------------------------------------
+        // 2. FILTER LOGIC: Restrict Revenue/Expenses to selected dates
+        // ------------------------------------------------------------------
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('date',[$request->start_date, $request->end_date]);
             // Materials use timestamp creation date since it is logged at entry
             $matQuery->whereBetween('created_at',[$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
         }
 
-        // Base totals calculated respecting the filters
+        // Base totals calculated respecting the filters for the "Selected Period"
         $income = (float) (clone $query)->where('type', 'income')->sum('amount');
         $expense = (float) (clone $query)->where('type', 'expense')->sum('amount');
         $prepayment = (float) (clone $query)->where('type', 'pre-payment')->sum('amount');
@@ -59,13 +71,13 @@ class FinanceController extends Controller {
             ->get();
 
         return response()->json([
-            'total_balance' => (float)($income - $expense - $prepayment),
+            'total_balance' => $netBalance,  // Pushing the protected all-time balance
             'total_income' => $income,
             'total_expense' => $expense,
             'total_prepayment' => $prepayment,
             'monthly_stats' => $monthlyStats,
-            'category_breakdown' => $categoryBreakdown, // Feeding Donut chart
-            'material_breakdown' => $materialBreakdown, // Feeding Material Bar chart
+            'category_breakdown' => $categoryBreakdown,
+            'material_breakdown' => $materialBreakdown,
             'recent_transactions' => (clone $query)->orderBy('date', 'desc')->take(5)->get()
         ]);
     }
