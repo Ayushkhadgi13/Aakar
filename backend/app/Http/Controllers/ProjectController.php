@@ -9,6 +9,7 @@ use App\Models\ProjectDocument;
 use App\Models\ProjectMaterialEstimate;
 use App\Models\VendorMaterial;
 use App\Models\User;
+use App\Events\ProjectUpdatePosted; // <--- Brought in the Event
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -107,7 +108,7 @@ class ProjectController extends Controller {
             $actTotalCost = $actual ? (float)$actual->total_cost : 0;
             $estTotalCost = (float)$est->estimated_quantity * (float)$est->estimated_unit_price;
 
-            return [
+            return[
                 'material' => $est->material_name,
                 'unit' => $est->unit,
                 'est_qty' => $est->estimated_quantity,
@@ -164,7 +165,7 @@ class ProjectController extends Controller {
         $breakdown = $allMaterials->map(function ($material) use ($estimates, $actuals) {
             $estCost = (float) ($estimates->has($material) ? $estimates->get($material)->total_estimated : 0);
             $actCost = (float) ($actuals->has($material) ? $actuals->get($material)->total_actual : 0);
-            return [
+            return[
                 'material_name' => $material,
                 'estimated_cost' => $estCost,
                 'actual_cost' => $actCost,
@@ -199,7 +200,6 @@ class ProjectController extends Controller {
             'status' => $status,
         ]);
 
-        // Notify all admins when a BOQ file is uploaded for review
         if ($request->type === 'BOQ') {
             $admins = User::where('role', 'admin')->get();
             Notification::send($admins, new BOQUploaded($doc, $request->user()->name));
@@ -208,9 +208,6 @@ class ProjectController extends Controller {
         return response()->json($doc);
     }
 
-    /**
-     * Admin approves a BOQ document — notifies all project team members.
-     */
     public function approveDocument(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -218,16 +215,12 @@ class ProjectController extends Controller {
         $doc = ProjectDocument::findOrFail($id);
         $doc->update(['status' => 'approved']);
 
-        // Notify all team members on this project
         $project = Project::with('users')->findOrFail($doc->project_id);
         Notification::send($project->users, new BOQReviewed($doc, 'approved'));
 
         return response()->json(['message' => 'Document approved.', 'document' => $doc]);
     }
 
-    /**
-     * Admin rejects a BOQ document — notifies all project team members.
-     */
     public function rejectDocument(Request $request, $id) {
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -235,16 +228,12 @@ class ProjectController extends Controller {
         $doc = ProjectDocument::findOrFail($id);
         $doc->update(['status' => 'rejected']);
 
-        // Notify all team members on this project
         $project = Project::with('users')->findOrFail($doc->project_id);
         Notification::send($project->users, new BOQReviewed($doc, 'rejected'));
 
         return response()->json(['message' => 'Document rejected.', 'document' => $doc]);
     }
 
-    /**
-     * Any team member (or admin) can delete a rejected BOQ document.
-     */
     public function deleteDocument(Request $request, $id) {
         $doc = ProjectDocument::findOrFail($id);
         $user = $request->user();
@@ -282,6 +271,10 @@ class ProjectController extends Controller {
             'message' => $request->message,
             'image_path' => $imagePath ? '/storage/' . $imagePath : null
         ]);
+
+        // FIRE WEBSOCKET EVENT TO LIVE CHAT
+        broadcast(new ProjectUpdatePosted($update))->toOthers();
+
         return response()->json($update->load('user'));
     }
 }
