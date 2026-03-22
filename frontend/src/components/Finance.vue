@@ -2,8 +2,8 @@
   <div class="finance-page">
     <header class="finance-header">
       <div class="header-left">
-        <h1>Finance & Payroll</h1>
-        <p>Manage project procurement and employee salaries.</p>
+        <h1>Finance & Analytics</h1>
+        <p>Manage procurement, view exact expenditures, and process payroll.</p>
       </div>
       <div class="header-right">
         <div v-if="isAdmin" class="action-buttons">
@@ -13,21 +13,48 @@
       </div>
     </header>
 
+    <!-- DATE FILTERS (Admin Only) -->
+    <div class="filter-bar" v-if="isAdmin">
+      <div class="filter-item">
+        <label>Start Date</label>
+        <input type="date" v-model="filters.start_date" @change="loadData" />
+      </div>
+      <div class="filter-item">
+        <label>End Date</label>
+        <input type="date" v-model="filters.end_date" @change="loadData" />
+      </div>
+      <button @click="clearFilters" class="btn filter-clear">Clear</button>
+    </div>
+
     <!-- KPI STATS (Admins Only) -->
     <section class="stats-container" v-if="isAdmin && summary">
       <div class="stat-box">
-        <label>Total Balance</label>
+        <label>Net Balance</label>
         <div class="value">Rs. {{ summary.total_balance?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
-        <label>Monthly Revenue</label>
+        <label>Selected Period Revenue</label>
         <div class="value positive">Rs. {{ summary.total_income?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
-        <label>Monthly Expenses</label>
+        <label>Selected Period Expenses</label>
         <div class="value negative">Rs. {{ summary.total_expense?.toLocaleString() || 0 }}</div>
       </div>
     </section>
+
+    <!-- IN-DEPTH CHARTS (Admins Only) -->
+    <div class="detailed-charts" v-if="isAdmin && summary">
+        <!-- Chart 1: Expenditure grouped by generic categories -->
+        <div class="chart-card">
+            <div class="chart-header"><h3>Expenses by Category</h3></div>
+            <apexchart type="donut" height="300" :options="categoryChartOptions" :series="categorySeries" />
+        </div>
+        <!-- Chart 2: Hard breakdown of exact materials bought (Steel, cement, etc.) -->
+        <div class="chart-card">
+            <div class="chart-header"><h3>Deep Dive: Exact Material Costs</h3></div>
+            <apexchart type="bar" height="300" :options="materialChartOptions" :series="materialSeries" />
+        </div>
+    </div>
 
     <div class="finance-grid" :class="{ 'full-width': !isAdmin }">
       <!-- EMPLOYEE PAYROLL (Admins Only) -->
@@ -248,6 +275,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import apexchart from "vue3-apexcharts";
 import { useAuth } from '../useAuth';
 
 const { isAdmin, loadUser } = useAuth();
@@ -255,6 +283,31 @@ const summary = ref({});
 const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
+
+// Filter Bindings
+const filters = ref({ start_date: '', end_date: '' });
+
+// Chart configuration setups
+const categorySeries = ref([]);
+const categoryChartOptions = ref({
+    labels:[],
+    chart: { type: 'donut', fontFamily: 'Plus Jakarta Sans, sans-serif' },
+    colors:['#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#10B981', '#64748B'],
+    dataLabels: { enabled: false },
+    legend: { position: 'bottom', labels: { colors: 'var(--text-main)' } }
+});
+
+const materialSeries = ref([]);
+const materialChartOptions = ref({
+    chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
+    xaxis: { categories:[], labels: { style: { colors: 'var(--text-muted)' } } },
+    yaxis: { labels: { style: { colors: 'var(--text-muted)' }, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k` } },
+    colors: ['#A65D43'],
+    plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
+    dataLabels: { enabled: true, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k`, style: { colors: ['#fff'] } },
+    grid: { borderColor: 'var(--border)' }
+});
+
 const showVendorModal = ref(false);
 const showTransactionModal = ref(false);
 const showDetailModal = ref(false);
@@ -263,21 +316,33 @@ const isSaving = ref(false);
 const currentMonthLabel = ref(
   new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
 );
+
 const formV = ref({ name: '', project_id: '', contact_person: '', phone: '', materials: [{ material_name: '', unit_price: '', quantity: '' }] });
 const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' });
 
+const clearFilters = () => {
+    filters.value = { start_date: '', end_date: '' };
+    loadData();
+};
+
 const loadData = async () => {
   try {
-    // Ensure user is loaded (cached — no extra network call if already done)
     await loadUser();
 
-    const commonReqs = [
+    // Passing our parameters logic directly up to the backend
+    const params = {};
+    if (filters.value.start_date && filters.value.end_date) {
+        params.start_date = filters.value.start_date;
+        params.end_date = filters.value.end_date;
+    }
+
+    const commonReqs =[
       axios.get('/finance/vendors'),
       axios.get('/projects')
     ];
 
     if (isAdmin.value) {
-      commonReqs.push(axios.get('/finance/summary'));
+      commonReqs.push(axios.get('/finance/summary', { params }));
       commonReqs.push(axios.get('/finance/employees'));
     }
 
@@ -288,6 +353,22 @@ const loadData = async () => {
     if (isAdmin.value) {
       summary.value = responses[2].data;
       employees.value = responses[3].data;
+
+      // Reactively pump data into the new Charts
+      categorySeries.value = summary.value.category_breakdown.map(c => Number(c.total));
+      categoryChartOptions.value = {
+          ...categoryChartOptions.value,
+          labels: summary.value.category_breakdown.map(c => c.category)
+      };
+
+      materialSeries.value =[{
+          name: 'Material Cost',
+          data: summary.value.material_breakdown.map(m => Number(m.total_cost))
+      }];
+      materialChartOptions.value = {
+          ...materialChartOptions.value,
+          xaxis: { categories: summary.value.material_breakdown.map(m => m.material_name) }
+      };
     }
   } catch (e) {
     console.error("Data load failed", e);
@@ -341,11 +422,18 @@ onMounted(loadData);
 
 <style scoped>
 .finance-page { padding: 40px; animation: fadeIn 0.4s ease-out; }
-.finance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.finance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .header-right { display: flex; gap: 10px; }
 .action-buttons { display: flex; gap: 10px; }
 h1 { color: var(--text-main); font-size: 2rem; font-weight: 800; margin: 0; }
 p { color: var(--text-secondary); margin-top: 5px; }
+
+/* FILTERS */
+.filter-bar { display: flex; gap: 15px; margin-bottom: 25px; background: var(--bg-surface); padding: 15px 25px; border-radius: 16px; border: 1px solid var(--border); align-items: flex-end; }
+.filter-item { display: flex; flex-direction: column; gap: 5px; }
+.filter-item label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
+.filter-item input { margin: 0; padding: 8px 12px; }
+.filter-clear { padding: 8px 15px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-body); }
 
 /* KPI CARDS */
 .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
@@ -354,6 +442,12 @@ p { color: var(--text-secondary); margin-top: 5px; }
 .stat-box .value { font-size: 1.5rem; font-weight: 800; margin-top: 10px; color: var(--text-main); }
 .positive { color: var(--success-text) !important; }
 .negative { color: var(--danger-text) !important; }
+
+/* CHARTS SECTION */
+.detailed-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.chart-card { background: var(--bg-surface); padding: 20px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.chart-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
 
 /* GRID */
 .finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
@@ -432,5 +526,9 @@ input:focus, select:focus { border-color: var(--primary); outline: none; }
 .modal-footer { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@media (max-width: 1024px) { .finance-grid { grid-template-columns: 1fr; } .stats-container { grid-template-columns: 1fr; } }
+@media (max-width: 1024px) { 
+  .finance-grid { grid-template-columns: 1fr; } 
+  .stats-container { grid-template-columns: 1fr; } 
+  .detailed-charts { grid-template-columns: 1fr; }
+}
 </style>
