@@ -175,11 +175,11 @@
         </div>
       </div>
 
-      <!-- RIGHT: UPDATES & CHAT -->
+      <!-- RIGHT: UPDATES & LIVE CHAT -->
       <div class="updates-feed">
         <div class="feed-header">
           <h2>Site Updates & Logs</h2>
-          <p>Real-time progress reporting</p>
+          <p>Live progress chat</p>
         </div>
 
         <div class="chat-window" id="chat-window">
@@ -319,7 +319,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import apexchart from "vue3-apexcharts";
@@ -356,10 +356,10 @@ const isSavingTeam = ref(false);
 const financialSeries = ref([]);
 const financialOptions = ref({
   chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
-  colors: ['#10B981', '#EF4444'],
+  colors:['#10B981', '#EF4444'],
   plotOptions: { bar: { borderRadius: 4, distributed: true, horizontal: false } },
   dataLabels: { enabled: false },
-  xaxis: { categories: ['Estimated', 'Actual'], labels: { style: { colors: '#64748B' } } },
+  xaxis: { categories:['Estimated', 'Actual'], labels: { style: { colors: '#64748B' } } },
   yaxis: { labels: { formatter: (val) => `Rs. ${val / 1000}k` } },
   grid: { borderColor: '#E2E8F0' },
   legend: { show: false }
@@ -368,7 +368,7 @@ const financialOptions = ref({
 const inventorySeries = ref([]);
 const inventoryOptions = ref({
   labels: ['Consumed', 'In Stock'],
-  colors: ['#A65D43', '#10B981'],
+  colors:['#A65D43', '#10B981'],
   legend: { position: 'bottom' },
   dataLabels: { enabled: false },
   plotOptions: { pie: { donut: { size: '65%' } } }
@@ -430,7 +430,7 @@ const fetchAnalytics = async () => {
       axios.get(`/projects/${pId}/financial-variance`),
       axios.get(`/projects/${pId}/inventory`)
     ]);
-    financialSeries.value = [{ name: 'Amount', data: [finRes.data.estimated_total, finRes.data.actual_total] }];
+    financialSeries.value =[{ name: 'Amount', data: [finRes.data.estimated_total, finRes.data.actual_total] }];
     let totalPurchased = 0; let totalUsed = 0;
     if (invRes.data.inventory && Array.isArray(invRes.data.inventory)) {
       invRes.data.inventory.forEach(item => {
@@ -439,7 +439,7 @@ const fetchAnalytics = async () => {
       });
     }
     const currentStock = Math.max(0, totalPurchased - totalUsed);
-    inventorySeries.value = totalPurchased > 0 ? [totalUsed, currentStock] : [];
+    inventorySeries.value = totalPurchased > 0 ?[totalUsed, currentStock] :[];
   } catch (e) {}
 };
 
@@ -483,18 +483,14 @@ const approveDoc = async (doc) => {
   try {
     await axios.patch(`/documents/${doc.id}/approve`);
     doc.status = 'approved';
-  } catch (e) {
-    alert("Failed to approve document.");
-  }
+  } catch (e) { alert("Failed to approve document."); }
 };
 
 const rejectDoc = async (doc) => {
   try {
     await axios.patch(`/documents/${doc.id}/reject`);
     doc.status = 'rejected';
-  } catch (e) {
-    alert("Failed to reject document.");
-  }
+  } catch (e) { alert("Failed to reject document."); }
 };
 
 const deleteDoc = async (doc) => {
@@ -502,22 +498,32 @@ const deleteDoc = async (doc) => {
   try {
     await axios.delete(`/documents/${doc.id}`);
     project.value.documents = project.value.documents.filter(d => d.id !== doc.id);
-  } catch (e) {
-    alert("Failed to remove document.");
-  }
+  } catch (e) { alert("Failed to remove document."); }
 };
 
 const scrollToBottom = () => { nextTick(() => { const chat = document.getElementById('chat-window'); if (chat) chat.scrollTop = chat.scrollHeight; }); };
 const handleFileUpload = (event) => selectedFile.value = event.target.files[0];
+
 const postUpdate = async () => {
   isPosting.value = true;
   const formData = new FormData();
   if (newMessage.value) formData.append('message', newMessage.value);
   if (selectedFile.value) formData.append('image', selectedFile.value);
+  
   try {
-    await axios.post(`/projects/${route.params.id}/updates`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-    newMessage.value = ''; selectedFile.value = null; fetchDetails();
-  } catch (e) {} finally { isPosting.value = false; }
+    const res = await axios.post(`/projects/${route.params.id}/updates`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    newMessage.value = ''; 
+    selectedFile.value = null; 
+    
+    // Local insertion to feel completely instant (Reverb toOthers prevents duplicating here)
+    if (!project.value.updates) project.value.updates =[];
+    project.value.updates.push(res.data);
+    scrollToBottom();
+  } catch (e) {
+      console.error(e);
+  } finally { 
+      isPosting.value = false; 
+  }
 };
 
 const getImageUrl = (path) => `http://127.0.0.1:8000${path}`;
@@ -525,7 +531,28 @@ const openImage = (path) => zoomImage.value = path;
 const formatDate = (d) => new Date(d).toLocaleDateString();
 const formatTime = (d) => new Date(d).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-onMounted(fetchDetails);
+// LIVE CHAT SETUP via Reverb
+onMounted(() => {
+  fetchDetails();
+  
+  if (window.Echo) {
+    // We attach onto the specific project ID channel
+    window.Echo.private(`project.${route.params.id}`)
+      .listen('.ProjectUpdatePosted', (e) => {
+        if (!project.value.updates) project.value.updates =[];
+        // Push payload immediately
+        project.value.updates.push(e.update);
+        scrollToBottom();
+      });
+  }
+});
+
+// DISCONNECT FROM LIVE CHAT
+onUnmounted(() => {
+  if (window.Echo) {
+    window.Echo.leave(`project.${route.params.id}`);
+  }
+});
 </script>
 
 <style scoped>
@@ -610,7 +637,7 @@ onMounted(fetchDetails);
 .u-image img { max-width: 280px; border-radius: 16px; cursor: zoom-in; margin-top: 10px; box-shadow: var(--shadow-md); }
 .input-area { padding: 20px 30px; background: var(--bg-surface); border-top: 1px solid var(--border); }
 .input-wrapper { border: 2px solid var(--border); border-radius: 16px; padding: 8px; background: var(--bg-input); }
-textarea { width: 100%; border: none; outline: none; padding: 10px 15px; background: transparent; color: var(--text-main); font-family: inherit; }
+textarea { width: 100%; border: none; outline: none; padding: 10px 15px; background: transparent; color: var(--text-main); font-family: inherit; resize: none;}
 .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; margin-top: 5px; }
 .tool-btn { font-size: 0.9rem; color: var(--text-secondary); cursor: pointer; font-weight: 600; display: flex; gap: 6px; padding: 6px 12px; border-radius: 8px; }
 .tool-btn:hover { background: var(--border); color: var(--text-main); }
