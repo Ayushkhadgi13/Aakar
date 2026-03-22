@@ -10,7 +10,6 @@ use App\Models\VendorMaterial;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use App\Http\Requests\StoreTransactionRequest;
 use App\Notifications\SalaryPaid;
 
 class FinanceController extends Controller {
@@ -19,51 +18,59 @@ class FinanceController extends Controller {
         $query = Transaction::query();
         $matQuery = VendorMaterial::query();
 
-        // ------------------------------------------------------------------
-        // 1. ALL-TIME NET BALANCE (Unaffected by date filters, cannot be < 0)
-        // ------------------------------------------------------------------
+        // 1. ALL-TIME NET BALANCE (Unaffected by filters)
         $allTimeIncome = (float) Transaction::where('type', 'income')->sum('amount');
         $allTimeExpense = (float) Transaction::where('type', 'expense')->sum('amount');
         $allTimePrepayment = (float) Transaction::where('type', 'pre-payment')->sum('amount');
-        
-        // max(0, ...) ensures the balance never displays as a negative number
         $netBalance = max(0, $allTimeIncome - $allTimeExpense - $allTimePrepayment);
 
-        // ------------------------------------------------------------------
-        // 2. FILTER LOGIC: Restrict Revenue/Expenses to selected dates
-        // ------------------------------------------------------------------
+        // 2. APPLY FILTERS (Dates & Project Selection)
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('date',[$request->start_date, $request->end_date]);
-            // Materials use timestamp creation date since it is logged at entry
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
             $matQuery->whereBetween('created_at',[$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
         }
+        
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->project_id);
+            // Link materials to the selected project via the vendor relationship
+            $matQuery->whereHas('vendor', function($q) use ($request) {
+                $q->where('project_id', $request->project_id);
+            });
+        }
 
-        // Base totals calculated respecting the filters for the "Selected Period"
         $income = (float) (clone $query)->where('type', 'income')->sum('amount');
         $expense = (float) (clone $query)->where('type', 'expense')->sum('amount');
         $prepayment = (float) (clone $query)->where('type', 'pre-payment')->sum('amount');
         
-        // General month-over-month trend line 
-        $monthlyStats = Transaction::select(
-            DB::raw('MONTHNAME(date) as month'),
-            DB::raw('MONTH(date) as month_num'),
-            DB::raw('SUM(CASE WHEN type = "income" THEN amount ELSE 0 END) as income'),
-            DB::raw('SUM(CASE WHEN type = "expense" OR type = "pre-payment" THEN amount ELSE 0 END) as expense')
-        )
-        ->where('date', '>=', Carbon::now()->subMonths(6))
-        ->groupBy(DB::raw('MONTHNAME(date)'), DB::raw('MONTH(date)'))
-        ->orderBy('month_num', 'asc')
-        ->get();
+        // 3. THE NEW CHART DATA: Project-Wise Monthly Expense Breakdown
+        $trendQuery = Transaction::leftJoin('projects', 'transactions.project_id', '=', 'projects.id')
+            ->select(
+                DB::raw('MONTHNAME(date) as month'),
+                DB::raw('MONTH(date) as month_num'),
+                DB::raw('COALESCE(projects.name, "General / Unassigned") as project_name'),
+                DB::raw('SUM(amount) as cost')
+            )
+            ->whereIn('type', ['expense', 'pre-payment'])
+            ->where('date', '>=', Carbon::now()->subMonths(6));
 
-        // DEEP DIVE: What exactly are we spending on? Group by transaction category
+        // If a specific project is searched, isolate the chart to just that project
+        if ($request->filled('project_id')) {
+            $trendQuery->where('transactions.project_id', $request->project_id);
+        }
+
+        $projectMonthlyStats = $trendQuery
+            ->groupBy('month', 'month_num', 'projects.name')
+            ->orderBy('month_num', 'asc')
+            ->get();
+
+        // 4. DEEP DIVES
         $categoryBreakdown = (clone $query)
             ->select('category', DB::raw('SUM(amount) as total'))
-            ->whereIn('type', ['expense', 'pre-payment'])
+            ->whereIn('type',['expense', 'pre-payment'])
             ->groupBy('category')
             ->orderBy('total', 'desc')
             ->get();
 
-        // DEEP DIVE: What exact materials are costing us money? (Steel, cement, etc.)
         $materialBreakdown = (clone $matQuery)
             ->select('material_name', DB::raw('SUM(total_price) as total_cost'))
             ->groupBy('material_name')
@@ -71,11 +78,11 @@ class FinanceController extends Controller {
             ->get();
 
         return response()->json([
-            'total_balance' => $netBalance,  // Pushing the protected all-time balance
+            'total_balance' => $netBalance,
             'total_income' => $income,
             'total_expense' => $expense,
             'total_prepayment' => $prepayment,
-            'monthly_stats' => $monthlyStats,
+            'project_monthly_stats' => $projectMonthlyStats, // Feeds the new stacked chart
             'category_breakdown' => $categoryBreakdown,
             'material_breakdown' => $materialBreakdown,
             'recent_transactions' => (clone $query)->orderBy('date', 'desc')->take(5)->get()
@@ -123,7 +130,6 @@ class FinanceController extends Controller {
 
         $employees = Employee::orderBy('name', 'asc')->get()->map(function ($emp) use ($currentMonth, $currentYear) {
             $descriptionPrefix = "Salary payment for " . $emp->name;
-
             $paidThisMonth = Transaction::where('category', 'Salary')
                 ->where('description', 'LIKE', $descriptionPrefix . '%')
                 ->whereMonth('date', $currentMonth)
@@ -139,9 +145,8 @@ class FinanceController extends Controller {
 
     public function storeEmployee(Request $request) {
         if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized. Only admins can add employees.'], 403);
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
-
         $data = $request->validate([
             'name' => 'required|string',
             'role' => 'required|string',
@@ -153,7 +158,6 @@ class FinanceController extends Controller {
 
     public function paySalary(Request $request, $id) {
         $employee = Employee::findOrFail($id);
-        
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
         $monthLabel = Carbon::now()->format('F Y');
@@ -167,9 +171,7 @@ class FinanceController extends Controller {
             ->exists();
 
         if ($alreadyPaid) {
-            return response()->json([
-                'message' => 'Salary already paid for ' . $employee->name . ' this month.'
-            ], 422);
+            return response()->json(['message' => 'Salary already paid for ' . $employee->name . ' this month.'], 422);
         }
         
         $transaction = Transaction::create([
@@ -184,11 +186,19 @@ class FinanceController extends Controller {
         if ($user) {
             $user->notify(new SalaryPaid((float) $employee->salary_amount, $monthLabel));
         }
-
-        return response()->json(['message' => 'Salary processed successfully', 'transaction' => $transaction]);
+        return response()->json(['message' => 'Salary processed', 'transaction' => $transaction]);
     }
 
-    public function storeTransaction(StoreTransactionRequest $request) {
-        return response()->json(Transaction::create($request->validated()));
+    // Replaced standard request with inline validation to account for the new project_id
+    public function storeTransaction(Request $request) {
+        $validated = $request->validate([
+            'type' => 'required|in:income,expense,pre-payment',
+            'amount' => 'required|numeric|min:0',
+            'category' => 'required|string',
+            'date' => 'required|date',
+            'description' => 'nullable|string',
+            'project_id' => 'nullable|exists:projects,id'
+        ]);
+        return response()->json(Transaction::create($validated));
     }
 }

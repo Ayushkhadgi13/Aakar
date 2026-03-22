@@ -13,8 +13,15 @@
       </div>
     </header>
 
-    <!-- DATE FILTERS (Admin Only) -->
+    <!-- SEARCH & DATE FILTERS -->
     <div class="filter-bar" v-if="isAdmin">
+      <div class="filter-item">
+        <label>Filter by Project</label>
+        <select v-model="filters.project_id" @change="loadData" class="project-filter">
+          <option value="">All Projects</option>
+          <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+        </select>
+      </div>
       <div class="filter-item">
         <label>Start Date</label>
         <input type="date" v-model="filters.start_date" @change="loadData" />
@@ -26,30 +33,41 @@
       <button @click="clearFilters" class="btn filter-clear">Clear</button>
     </div>
 
-    <!-- KPI STATS (Admins Only) -->
+    <!-- KPI STATS -->
     <section class="stats-container" v-if="isAdmin && summary">
       <div class="stat-box">
-        <label>Net Balance</label>
+        <label>All-Time Available Balance</label>
         <div class="value">Rs. {{ summary.total_balance?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
-        <label>Selected Period Revenue</label>
+        <label>Filtered Revenue</label>
         <div class="value positive">Rs. {{ summary.total_income?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
-        <label>Selected Period Expenses</label>
+        <label>Filtered Expenses</label>
         <div class="value negative">Rs. {{ summary.total_expense?.toLocaleString() || 0 }}</div>
       </div>
     </section>
 
-    <!-- IN-DEPTH CHARTS (Admins Only) -->
+    <!-- IN-DEPTH CHARTS -->
     <div class="detailed-charts" v-if="isAdmin && summary">
-        <!-- Chart 1: Expenditure grouped by generic categories -->
+        
+        <!-- NEW STACKED CHART: Monthly breakdown showing exactly what project cost what -->
+        <div class="chart-card full-width-chart">
+            <div class="chart-header">
+              <h3>Monthly Expense Breakdown by Project</h3>
+              <span class="hint-text">Hover over segments to see specific project costs</span>
+            </div>
+            <apexchart type="bar" height="350" :options="trendChartOptions" :series="trendSeries" />
+        </div>
+
+        <!-- Expense Distribution -->
         <div class="chart-card">
             <div class="chart-header"><h3>Expenses by Category</h3></div>
             <apexchart type="donut" height="300" :options="categoryChartOptions" :series="categorySeries" />
         </div>
-        <!-- Chart 2: Hard breakdown of exact materials bought (Steel, cement, etc.) -->
+
+        <!-- Material Cost Details -->
         <div class="chart-card">
             <div class="chart-header"><h3>Deep Dive: Exact Material Costs</h3></div>
             <apexchart type="bar" height="300" :options="materialChartOptions" :series="materialSeries" />
@@ -57,7 +75,7 @@
     </div>
 
     <div class="finance-grid" :class="{ 'full-width': !isAdmin }">
-      <!-- EMPLOYEE PAYROLL (Admins Only) -->
+      <!-- EMPLOYEE PAYROLL -->
       <section class="content-card" v-if="isAdmin">
         <div class="card-head">
           <h2>Employee Payroll</h2>
@@ -90,7 +108,7 @@
         </table>
       </section>
 
-      <!-- VENDOR LIST (Visible to Everyone) -->
+      <!-- VENDOR LIST -->
       <section class="content-card vendor-section">
         <div class="card-head">
           <h2>Vendor Directory</h2>
@@ -184,7 +202,7 @@
       </div>
     </div>
 
-    <!-- 2. REGISTER VENDOR MODAL (Admin Only) -->
+    <!-- 2. REGISTER VENDOR MODAL -->
     <div v-if="showVendorModal" class="modal-backdrop">
       <div class="modal-card wide">
         <div class="modal-header">
@@ -232,7 +250,7 @@
       </div>
     </div>
 
-    <!-- 3. TRANSACTION MODAL (Admin Only) -->
+    <!-- 3. TRANSACTION MODAL -->
     <div v-if="showTransactionModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
@@ -248,9 +266,19 @@
               <option value="pre-payment">Pre-payment</option>
             </select>
           </div>
+          
+          <!-- New Project Link feature inside transaction creation -->
+          <div class="form-group" v-if="formT.type !== 'income'">
+            <label>Link to Project (Optional)</label>
+            <select v-model="formT.project_id">
+              <option value="">General / No Specific Project</option>
+              <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
+          </div>
+
           <div class="form-group">
             <label>Category</label>
-            <input type="text" v-model="formT.category" required placeholder="e.g. Materials, Logistics, Sales" />
+            <input type="text" v-model="formT.category" required placeholder="e.g. Logistics, Consulting" />
           </div>
           <div class="form-group">
             <label>Amount (Rs.)</label>
@@ -284,10 +312,24 @@ const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
 
-// Filter Bindings
-const filters = ref({ start_date: '', end_date: '' });
+// Extended filter mappings
+const filters = ref({ start_date: '', end_date: '', project_id: '' });
 
-// Chart configuration setups
+// 1. STACKED BAR CHART: Expenses by Project
+const trendSeries = ref([]);
+const trendChartOptions = ref({
+    chart: { type: 'bar', stacked: true, fontFamily: 'Plus Jakarta Sans, sans-serif', toolbar: { show: false } },
+    plotOptions: { bar: { borderRadius: 4, horizontal: false, columnWidth: '40%' } },
+    dataLabels: { enabled: false },
+    xaxis: { categories:[], labels: { style: { colors: 'var(--text-muted)' } } },
+    yaxis: { labels: { style: { colors: 'var(--text-muted)' }, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k` } },
+    // Vibrant array of colors to represent different stacked projects clearly
+    colors:['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#A65D43', '#0EA5E9', '#F43F5E'],
+    legend: { position: 'top', horizontalAlign: 'right', labels: { colors: 'var(--text-main)' } },
+    fill: { opacity: 1 },
+    grid: { borderColor: 'var(--border)' }
+});
+
 const categorySeries = ref([]);
 const categoryChartOptions = ref({
     labels:[],
@@ -302,7 +344,7 @@ const materialChartOptions = ref({
     chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
     xaxis: { categories:[], labels: { style: { colors: 'var(--text-muted)' } } },
     yaxis: { labels: { style: { colors: 'var(--text-muted)' }, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k` } },
-    colors: ['#A65D43'],
+    colors:['#A65D43'],
     plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
     dataLabels: { enabled: true, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k`, style: { colors: ['#fff'] } },
     grid: { borderColor: 'var(--border)' }
@@ -317,11 +359,11 @@ const currentMonthLabel = ref(
   new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
 );
 
-const formV = ref({ name: '', project_id: '', contact_person: '', phone: '', materials: [{ material_name: '', unit_price: '', quantity: '' }] });
-const formT = ref({ type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' });
+const formV = ref({ name: '', project_id: '', contact_person: '', phone: '', materials:[{ material_name: '', unit_price: '', quantity: '' }] });
+const formT = ref({ type: 'expense', amount: '', category: '', project_id: '', date: new Date().toISOString().split('T')[0], description: '' });
 
 const clearFilters = () => {
-    filters.value = { start_date: '', end_date: '' };
+    filters.value = { start_date: '', end_date: '', project_id: '' };
     loadData();
 };
 
@@ -329,11 +371,14 @@ const loadData = async () => {
   try {
     await loadUser();
 
-    // Passing our parameters logic directly up to the backend
+    // Mapping our filter variables dynamically
     const params = {};
     if (filters.value.start_date && filters.value.end_date) {
         params.start_date = filters.value.start_date;
         params.end_date = filters.value.end_date;
+    }
+    if (filters.value.project_id) {
+        params.project_id = filters.value.project_id;
     }
 
     const commonReqs =[
@@ -354,13 +399,30 @@ const loadData = async () => {
       summary.value = responses[2].data;
       employees.value = responses[3].data;
 
-      // Reactively pump data into the new Charts
+      // 1. PROCESS STACKED TREND CHART (Monthly Expense grouped by Project)
+      const stats = summary.value.project_monthly_stats;
+      const months = [...new Set(stats.map(s => s.month))];
+      const projectNames = [...new Set(stats.map(s => s.project_name))];
+
+      trendSeries.value = projectNames.map(pName => {
+        return {
+          name: pName,
+          data: months.map(m => {
+            const record = stats.find(s => s.project_name === pName && s.month === m);
+            return record ? Number(record.cost) : 0;
+          })
+        };
+      });
+      trendChartOptions.value = { ...trendChartOptions.value, xaxis: { categories: months } };
+
+      // 2. Process Categories
       categorySeries.value = summary.value.category_breakdown.map(c => Number(c.total));
       categoryChartOptions.value = {
           ...categoryChartOptions.value,
           labels: summary.value.category_breakdown.map(c => c.category)
       };
 
+      // 3. Process Material specific costs
       materialSeries.value =[{
           name: 'Material Cost',
           data: summary.value.material_breakdown.map(m => Number(m.total_cost))
@@ -387,7 +449,7 @@ const saveVendor = async () => {
   try {
     await axios.post('/finance/vendors', formV.value);
     showVendorModal.value = false;
-    formV.value = { name: '', project_id: '', contact_person: '', phone: '', materials: [{ material_name: '', unit_price: '', quantity: '' }] };
+    formV.value = { name: '', project_id: '', contact_person: '', phone: '', materials:[{ material_name: '', unit_price: '', quantity: '' }] };
     loadData();
   } catch (e) { alert("Failed to save vendor. Please check all fields."); }
   finally { isSaving.value = false; }
@@ -408,9 +470,15 @@ const processSalary = async (emp) => {
 
 const saveTransaction = async () => {
   try {
-    await axios.post('/finance/transactions', formT.value);
+    // Drop project_id if they selected "income" or "none"
+    const payload = { ...formT.value };
+    if (!payload.project_id || payload.type === 'income') {
+        delete payload.project_id;
+    }
+
+    await axios.post('/finance/transactions', payload);
     showTransactionModal.value = false;
-    formT.value = { type: 'expense', amount: '', category: '', date: new Date().toISOString().split('T')[0], description: '' };
+    formT.value = { type: 'expense', amount: '', category: '', project_id: '', date: new Date().toISOString().split('T')[0], description: '' };
     loadData();
   } catch (e) { alert("Failed to save transaction."); }
 };
@@ -429,11 +497,12 @@ h1 { color: var(--text-main); font-size: 2rem; font-weight: 800; margin: 0; }
 p { color: var(--text-secondary); margin-top: 5px; }
 
 /* FILTERS */
-.filter-bar { display: flex; gap: 15px; margin-bottom: 25px; background: var(--bg-surface); padding: 15px 25px; border-radius: 16px; border: 1px solid var(--border); align-items: flex-end; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; background: var(--bg-surface); padding: 15px 25px; border-radius: 16px; border: 1px solid var(--border); align-items: flex-end; }
 .filter-item { display: flex; flex-direction: column; gap: 5px; }
 .filter-item label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
-.filter-item input { margin: 0; padding: 8px 12px; }
-.filter-clear { padding: 8px 15px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-body); }
+.filter-item input, .filter-item select { margin: 0; padding: 8px 12px; height: 38px; }
+.project-filter { min-width: 220px; }
+.filter-clear { padding: 8px 15px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-body); height: 38px;}
 
 /* KPI CARDS */
 .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
@@ -446,6 +515,7 @@ p { color: var(--text-secondary); margin-top: 5px; }
 /* CHARTS SECTION */
 .detailed-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
 .chart-card { background: var(--bg-surface); padding: 20px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.full-width-chart { grid-column: 1 / -1; }
 .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .chart-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
 
