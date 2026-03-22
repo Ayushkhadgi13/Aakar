@@ -15,11 +15,23 @@ use App\Notifications\SalaryPaid;
 
 class FinanceController extends Controller {
 
-    public function getSummary() {
-        $income = (float) Transaction::where('type', 'income')->sum('amount');
-        $expense = (float) Transaction::where('type', 'expense')->sum('amount');
-        $prepayment = (float) Transaction::where('type', 'pre-payment')->sum('amount');
+    public function getSummary(Request $request) {
+        $query = Transaction::query();
+        $matQuery = VendorMaterial::query();
+
+        // 1. FILTER LOGIC: Restrict to exact dates if user specifies them
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date',[$request->start_date, $request->end_date]);
+            // Materials use timestamp creation date since it is logged at entry
+            $matQuery->whereBetween('created_at',[$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
+        }
+
+        // Base totals calculated respecting the filters
+        $income = (float) (clone $query)->where('type', 'income')->sum('amount');
+        $expense = (float) (clone $query)->where('type', 'expense')->sum('amount');
+        $prepayment = (float) (clone $query)->where('type', 'pre-payment')->sum('amount');
         
+        // General month-over-month trend line 
         $monthlyStats = Transaction::select(
             DB::raw('MONTHNAME(date) as month'),
             DB::raw('MONTH(date) as month_num'),
@@ -31,13 +43,30 @@ class FinanceController extends Controller {
         ->orderBy('month_num', 'asc')
         ->get();
 
+        // DEEP DIVE: What exactly are we spending on? Group by transaction category
+        $categoryBreakdown = (clone $query)
+            ->select('category', DB::raw('SUM(amount) as total'))
+            ->whereIn('type', ['expense', 'pre-payment'])
+            ->groupBy('category')
+            ->orderBy('total', 'desc')
+            ->get();
+
+        // DEEP DIVE: What exact materials are costing us money? (Steel, cement, etc.)
+        $materialBreakdown = (clone $matQuery)
+            ->select('material_name', DB::raw('SUM(total_price) as total_cost'))
+            ->groupBy('material_name')
+            ->orderBy('total_cost', 'desc')
+            ->get();
+
         return response()->json([
             'total_balance' => (float)($income - $expense - $prepayment),
             'total_income' => $income,
             'total_expense' => $expense,
             'total_prepayment' => $prepayment,
             'monthly_stats' => $monthlyStats,
-            'recent_transactions' => Transaction::orderBy('date', 'desc')->take(5)->get()
+            'category_breakdown' => $categoryBreakdown, // Feeding Donut chart
+            'material_breakdown' => $materialBreakdown, // Feeding Material Bar chart
+            'recent_transactions' => (clone $query)->orderBy('date', 'desc')->take(5)->get()
         ]);
     }
 
@@ -139,7 +168,6 @@ class FinanceController extends Controller {
             'description' => $descriptionPrefix . " - " . $monthLabel,
         ]);
 
-        // Notify the matching user account (matched by name) about their salary payment
         $user = User::where('name', $employee->name)->first();
         if ($user) {
             $user->notify(new SalaryPaid((float) $employee->salary_amount, $monthLabel));
