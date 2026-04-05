@@ -312,7 +312,6 @@ const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
 
-// Extended filter mappings
 const filters = ref({ start_date: '', end_date: '', project_id: '' });
 
 // 1. STACKED BAR CHART: Expenses by Project
@@ -323,7 +322,6 @@ const trendChartOptions = ref({
     dataLabels: { enabled: false },
     xaxis: { categories:[], labels: { style: { colors: 'var(--text-muted)' } } },
     yaxis: { labels: { style: { colors: 'var(--text-muted)' }, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k` } },
-    // Vibrant array of colors to represent different stacked projects clearly
     colors:['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#A65D43', '#0EA5E9', '#F43F5E'],
     legend: { position: 'top', horizontalAlign: 'right', labels: { colors: 'var(--text-main)' } },
     fill: { opacity: 1 },
@@ -355,9 +353,7 @@ const showTransactionModal = ref(false);
 const showDetailModal = ref(false);
 const selectedVendor = ref(null);
 const isSaving = ref(false);
-const currentMonthLabel = ref(
-  new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
-);
+const currentMonthLabel = ref(new Date().toLocaleString('default', { month: 'long', year: 'numeric' }));
 
 const formV = ref({ name: '', project_id: '', contact_person: '', phone: '', materials:[{ material_name: '', unit_price: '', quantity: '' }] });
 const formT = ref({ type: 'expense', amount: '', category: '', project_id: '', date: new Date().toISOString().split('T')[0], description: '' });
@@ -371,7 +367,6 @@ const loadData = async () => {
   try {
     await loadUser();
 
-    // Mapping our filter variables dynamically
     const params = {};
     if (filters.value.start_date && filters.value.end_date) {
         params.start_date = filters.value.start_date;
@@ -392,17 +387,20 @@ const loadData = async () => {
     }
 
     const responses = await Promise.all(commonReqs);
-    vendors.value = responses[0].data;
-    projects.value = responses[1].data;
+    vendors.value = responses[0].data || [];
+    projects.value = responses[1].data ||[];
 
     if (isAdmin.value) {
-      summary.value = responses[2].data;
-      employees.value = responses[3].data;
+      summary.value = responses[2].data || {};
+      employees.value = responses[3].data ||[];
 
-      // 1. PROCESS STACKED TREND CHART (Monthly Expense grouped by Project)
-      const stats = summary.value.project_monthly_stats;
-      const months = [...new Set(stats.map(s => s.month))];
-      const projectNames = [...new Set(stats.map(s => s.project_name))];
+      // SAFETY CHECK: Fallback to empty array if undefined
+      const stats = summary.value.project_monthly_stats ||[];
+      const catStats = summary.value.category_breakdown || [];
+      const matStats = summary.value.material_breakdown || [];
+
+      const months =[...new Set(stats.map(s => s.month))];
+      const projectNames =[...new Set(stats.map(s => s.project_name))];
 
       trendSeries.value = projectNames.map(pName => {
         return {
@@ -415,25 +413,24 @@ const loadData = async () => {
       });
       trendChartOptions.value = { ...trendChartOptions.value, xaxis: { categories: months } };
 
-      // 2. Process Categories
-      categorySeries.value = summary.value.category_breakdown.map(c => Number(c.total));
+      categorySeries.value = catStats.map(c => Number(c.total));
       categoryChartOptions.value = {
           ...categoryChartOptions.value,
-          labels: summary.value.category_breakdown.map(c => c.category)
+          labels: catStats.map(c => c.category)
       };
 
-      // 3. Process Material specific costs
       materialSeries.value =[{
           name: 'Material Cost',
-          data: summary.value.material_breakdown.map(m => Number(m.total_cost))
+          data: matStats.map(m => Number(m.total_cost))
       }];
       materialChartOptions.value = {
           ...materialChartOptions.value,
-          xaxis: { categories: summary.value.material_breakdown.map(m => m.material_name) }
+          xaxis: { categories: matStats.map(m => m.material_name) }
       };
     }
   } catch (e) {
-    console.error("Data load failed", e);
+    // If it fails again, check your browser console! It will tell us exactly why.
+    console.error("Data load failed! API Error:", e.response?.data || e);
   }
 };
 
@@ -451,7 +448,7 @@ const saveVendor = async () => {
     showVendorModal.value = false;
     formV.value = { name: '', project_id: '', contact_person: '', phone: '', materials:[{ material_name: '', unit_price: '', quantity: '' }] };
     loadData();
-  } catch (e) { alert("Failed to save vendor. Please check all fields."); }
+  } catch (e) { alert("Failed to save vendor."); }
   finally { isSaving.value = false; }
 };
 
@@ -470,7 +467,6 @@ const processSalary = async (emp) => {
 
 const saveTransaction = async () => {
   try {
-    // Drop project_id if they selected "income" or "none"
     const payload = { ...formT.value };
     if (!payload.project_id || payload.type === 'income') {
         delete payload.project_id;

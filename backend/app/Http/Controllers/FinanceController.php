@@ -18,7 +18,7 @@ class FinanceController extends Controller {
         $query = Transaction::query();
         $matQuery = VendorMaterial::query();
 
-        // 1. ALL-TIME NET BALANCE (Unaffected by filters)
+        // 1. ALL-TIME NET BALANCE
         $allTimeIncome = (float) Transaction::where('type', 'income')->sum('amount');
         $allTimeExpense = (float) Transaction::where('type', 'expense')->sum('amount');
         $allTimePrepayment = (float) Transaction::where('type', 'pre-payment')->sum('amount');
@@ -26,7 +26,7 @@ class FinanceController extends Controller {
 
         // 2. APPLY FILTERS (Dates & Project Selection)
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+            $query->whereBetween('date',[$request->start_date, $request->end_date]);
             $matQuery->whereBetween('created_at',[$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
         }
         
@@ -43,17 +43,17 @@ class FinanceController extends Controller {
         $prepayment = (float) (clone $query)->where('type', 'pre-payment')->sum('amount');
         
         // 3. THE NEW CHART DATA: Project-Wise Monthly Expense Breakdown
+        // FIXED: Added explicit 'transactions.' prefixes to prevent SQL ambiguous column errors
         $trendQuery = Transaction::leftJoin('projects', 'transactions.project_id', '=', 'projects.id')
             ->select(
-                DB::raw('MONTHNAME(date) as month'),
-                DB::raw('MONTH(date) as month_num'),
+                DB::raw('MONTHNAME(transactions.date) as month'),
+                DB::raw('MONTH(transactions.date) as month_num'),
                 DB::raw('COALESCE(projects.name, "General / Unassigned") as project_name'),
-                DB::raw('SUM(amount) as cost')
+                DB::raw('SUM(transactions.amount) as cost')
             )
-            ->whereIn('type', ['expense', 'pre-payment'])
-            ->where('date', '>=', Carbon::now()->subMonths(6));
+            ->whereIn('transactions.type', ['expense', 'pre-payment'])
+            ->where('transactions.date', '>=', Carbon::now()->subMonths(6));
 
-        // If a specific project is searched, isolate the chart to just that project
         if ($request->filled('project_id')) {
             $trendQuery->where('transactions.project_id', $request->project_id);
         }
@@ -82,7 +82,7 @@ class FinanceController extends Controller {
             'total_income' => $income,
             'total_expense' => $expense,
             'total_prepayment' => $prepayment,
-            'project_monthly_stats' => $projectMonthlyStats, // Feeds the new stacked chart
+            'project_monthly_stats' => $projectMonthlyStats, 
             'category_breakdown' => $categoryBreakdown,
             'material_breakdown' => $materialBreakdown,
             'recent_transactions' => (clone $query)->orderBy('date', 'desc')->take(5)->get()
@@ -189,7 +189,6 @@ class FinanceController extends Controller {
         return response()->json(['message' => 'Salary processed', 'transaction' => $transaction]);
     }
 
-    // Replaced standard request with inline validation to account for the new project_id
     public function storeTransaction(Request $request) {
         $validated = $request->validate([
             'type' => 'required|in:income,expense,pre-payment',
