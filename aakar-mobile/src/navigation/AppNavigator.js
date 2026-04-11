@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,7 +17,6 @@ import EmployeesScreen from '../screens/EmployeesScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Stack specifically for Projects so we can push ProjectDetails over the tab bar
 const ProjectStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="ProjectList" component={ProjectsScreen} />
@@ -33,20 +32,64 @@ function MainTabs() {
       screenOptions={{
         tabBarActiveTintColor: '#A65D43',
         tabBarInactiveTintColor: '#94A3B8',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#E2E8F0',
+          elevation: 5,
+        },
+        headerStyle: { backgroundColor: '#fff' },
+        headerTintColor: '#111827',
         headerRight: () => (
-          <LogOut color="#EF4444" size={24} style={{ marginRight: 15 }} onPress={logout} />
-        )
+          <TouchableOpacity onPress={logout} style={{ marginRight: 15 }}>
+            <LogOut color="#EF4444" size={22} />
+          </TouchableOpacity>
+        ),
       }}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarIcon: ({ color }) => <Home color={color} size={24} /> }} />
-      <Tab.Screen name="Projects" component={ProjectStack} options={{ tabBarIcon: ({ color }) => <FolderGit2 color={color} size={24} /> }} />
-      <Tab.Screen name="Tasks" component={TasksScreen} options={{ tabBarIcon: ({ color }) => <CheckSquare color={color} size={24} /> }} />
-      
-      {/* Admin Only Tabs */}
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Home color={color} size={22} />,
+          title: 'Dashboard',
+        }}
+      />
+      <Tab.Screen
+        name="Projects"
+        component={ProjectStack}
+        options={{
+          tabBarIcon: ({ color }) => <FolderGit2 color={color} size={22} />,
+          title: 'Projects',
+          headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="Tasks"
+        component={TasksScreen}
+        options={{
+          tabBarIcon: ({ color }) => <CheckSquare color={color} size={22} />,
+          title: 'Tasks',
+        }}
+      />
+
       {user?.role === 'admin' && (
         <>
-          <Tab.Screen name="Finance" component={FinanceScreen} options={{ tabBarIcon: ({ color }) => <DollarSign color={color} size={24} /> }} />
-          <Tab.Screen name="Employees" component={EmployeesScreen} options={{ tabBarIcon: ({ color }) => <Users color={color} size={24} /> }} />
+          <Tab.Screen
+            name="Finance"
+            component={FinanceScreen}
+            options={{
+              tabBarIcon: ({ color }) => <DollarSign color={color} size={22} />,
+              title: 'Finance',
+            }}
+          />
+          <Tab.Screen
+            name="Employees"
+            component={EmployeesScreen}
+            options={{
+              tabBarIcon: ({ color }) => <Users color={color} size={22} />,
+              title: 'Employees',
+            }}
+          />
         </>
       )}
     </Tab.Navigator>
@@ -58,7 +101,7 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}>
         <ActivityIndicator size="large" color="#A65D43" />
       </View>
     );
