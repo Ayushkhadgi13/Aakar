@@ -3,7 +3,7 @@ import { ActivityIndicator, View, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, FolderGit2, CheckSquare, DollarSign, Users, LogOut } from 'lucide-react-native';
+import { Home, FolderGit2, CheckSquare, DollarSign, Users, LogOut, Truck } from 'lucide-react-native';
 
 import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
@@ -13,6 +13,7 @@ import ProjectDetailsScreen from '../screens/ProjectDetailsScreen';
 import TasksScreen from '../screens/TasksScreen';
 import FinanceScreen from '../screens/FinanceScreen';
 import EmployeesScreen from '../screens/EmployeesScreen';
+import VendorsScreen from '../screens/VendorsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -80,6 +81,14 @@ function MainTabs() {
             options={{
               tabBarIcon: ({ color }) => <DollarSign color={color} size={22} />,
               title: 'Finance',
+            }}
+          />
+          <Tab.Screen
+            name="Vendors"
+            component={VendorsScreen}
+            options={{
+              tabBarIcon: ({ color }) => <Truck color={color} size={22} />,
+              title: 'Vendors',
             }}
           />
           <Tab.Screen
