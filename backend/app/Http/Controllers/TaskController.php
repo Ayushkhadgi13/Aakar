@@ -2,34 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\Project;
-use Illuminate\Support\Facades\Auth;
 use App\Notifications\TaskAssigned;
 use App\Notifications\TaskCompleted;
+use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         if ($user->role === 'admin') {
             return response()->json([
-                'my_tasks' => Task::with('creator')->where('assigned_to', $user->id)->orderBy('due_date')->get(),
-                'assigned_by_me' => Task::with('assignee')->where('assigned_by', $user->id)->orderBy('created_at', 'desc')->get()
+                'my_tasks' => Task::with(['creator', 'project'])
+                    ->where('assigned_to', $user->id)
+                    ->orderBy('due_date')
+                    ->get(),
+                'assigned_by_me' => Task::with(['assignee', 'project'])
+                    ->where('assigned_by', $user->id)
+                    ->orderByDesc('created_at')
+                    ->get(),
             ]);
         }
 
         return response()->json([
-            'my_tasks' => Task::with('creator')->where('assigned_to', $user->id)->orderBy('due_date')->get(),
-            'assigned_by_me' => []
+            'my_tasks' => Task::with(['creator', 'project'])
+                ->where('assigned_to', $user->id)
+                ->orderBy('due_date')
+                ->get(),
+            'assigned_by_me' => [],
         ]);
     }
 
-    public function userStats(Request $request) {
+    public function userStats(Request $request)
+    {
         $userId = $request->user()->id;
 
         return response()->json([
@@ -37,16 +46,22 @@ class TaskController extends Controller
             'in_progress_count' => Task::where('assigned_to', $userId)->where('status', 'In Progress')->count(),
             'completed_count' => Task::where('assigned_to', $userId)->where('status', 'Completed')->count(),
             'active_projects' => Project::where('status', 'In Progress')->count(),
-            'recent_tasks' => Task::where('assigned_to', $userId)
-                                  ->where('status', '!=', 'Completed')
-                                  ->orderBy('due_date', 'asc')
-                                  ->take(5)
-                                  ->get()
+            'recent_tasks' => Task::with('project')
+                ->where('assigned_to', $userId)
+                ->where('status', '!=', 'Completed')
+                ->orderBy('due_date')
+                ->take(5)
+                ->get(),
         ]);
     }
 
     public function getUsers(Request $request)
     {
+        if ($request->filled('project_id')) {
+            $project = Project::with('users:id,name,email,role')->findOrFail($request->query('project_id'));
+            return response()->json($project->users);
+        }
+
         return response()->json(User::select('id', 'name', 'email', 'role')->get());
     }
 
@@ -59,26 +74,35 @@ class TaskController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'project_id' => 'required|exists:projects,id',
             'assigned_to' => 'required|exists:users,id',
             'due_date' => 'required|date',
         ]);
 
+        $project = Project::with('users:id')->findOrFail($data['project_id']);
+
+        if (!$project->users->pluck('id')->contains((int) $data['assigned_to'])) {
+            return response()->json([
+                'message' => 'Assignee must be a member of the selected project.',
+            ], 422);
+        }
+
         $task = Task::create([
             'title' => $data['title'],
             'description' => $data['description'],
+            'project_id' => $data['project_id'],
             'assigned_to' => $data['assigned_to'],
             'assigned_by' => $request->user()->id,
             'due_date' => $data['due_date'],
-            'status' => 'Pending'
+            'status' => 'Pending',
         ]);
 
-        // Notify the assignee about their new task
         $assignee = User::find($data['assigned_to']);
         if ($assignee) {
             $assignee->notify(new TaskAssigned($task, $request->user()->name));
         }
 
-        return response()->json($task->load('assignee'));
+        return response()->json($task->load(['assignee', 'project']));
     }
 
     public function update(Request $request, $id)
@@ -90,13 +114,12 @@ class TaskController extends Controller
         }
 
         $data = $request->validate([
-            'status' => 'required|in:Pending,In Progress,Completed'
+            'status' => 'required|in:Pending,In Progress,Completed',
         ]);
 
         $previousStatus = $task->status;
         $task->update(['status' => $data['status']]);
 
-        // Notify the admin who assigned the task when it gets completed
         if ($data['status'] === 'Completed' && $previousStatus !== 'Completed') {
             $assigner = User::find($task->assigned_by);
             if ($assigner) {
@@ -104,6 +127,6 @@ class TaskController extends Controller
             }
         }
 
-        return response()->json($task);
+        return response()->json($task->fresh(['project']));
     }
 }

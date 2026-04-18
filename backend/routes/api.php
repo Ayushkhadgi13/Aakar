@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
     Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
+    Route::get('/reports/monthly', [FinanceController::class, 'getMonthlyReports']);
 
     // Payroll Routes
     Route::get('/finance/employees', [FinanceController::class, 'getEmployees']);
@@ -49,6 +50,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/projects/{id}', [ProjectController::class, 'update']);
     Route::delete('/projects/{id}',[ProjectController::class, 'destroy']);
     Route::post('/projects/{id}/assign',[ProjectController::class, 'assignUsers']);
+    Route::get('/projects/{id}/members', [ProjectController::class, 'getMembers']);
+    Route::post('/projects/{id}/members', [ProjectController::class, 'addMembers']);
+    Route::delete('/projects/{id}/members/{userId}', [ProjectController::class, 'removeMember']);
 
     // Project Specifics
     Route::post('/projects/{id}/updates',[ProjectController::class, 'addUpdate']);
@@ -62,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // BOQ & Estimates
     Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']);
     Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']);
+    Route::get('/projects/{id}/materials/comparison', [ProjectController::class, 'getMaterialComparison']);
     Route::get('/projects/{id}/financial-variance', [ProjectController::class, 'getFinancialVariance']);
 
     // Material Routes

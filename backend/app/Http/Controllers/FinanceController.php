@@ -2,49 +2,49 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Transaction;
-use App\Models\Vendor;
 use App\Models\Employee;
-use App\Models\VendorMaterial;
+use App\Models\MonthlyReport;
+use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use App\Models\Vendor;
+use App\Models\VendorMaterial;
 use App\Notifications\SalaryPaid;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
-class FinanceController extends Controller {
-
-    public function getSummary(Request $request) {
+class FinanceController extends Controller
+{
+    public function getSummary(Request $request)
+    {
         $query = Transaction::query();
         $matQuery = VendorMaterial::query();
 
-        // 1. ALL-TIME NET BALANCE
         $allTimeIncome = (float) Transaction::where('type', 'income')->sum('amount');
         $allTimeExpense = (float) Transaction::where('type', 'expense')->sum('amount');
         $allTimePrepayment = (float) Transaction::where('type', 'pre-payment')->sum('amount');
         $netBalance = max(0, $allTimeIncome - $allTimeExpense - $allTimePrepayment);
 
-        // 2. APPLY FILTERS (Dates & Project Selection)
         if ($request->filled('start_date') && $request->filled('end_date')) {
-            $query->whereBetween('date',[$request->start_date, $request->end_date]);
-            $matQuery->whereBetween('created_at',[$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+            $matQuery->whereBetween('created_at', [
+                $request->start_date . ' 00:00:00',
+                $request->end_date . ' 23:59:59',
+            ]);
         }
-        
+
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->project_id);
-            // Link materials to the selected project via the vendor relationship
-            $matQuery->whereHas('vendor', function($q) use ($request) {
-                $q->where('project_id', $request->project_id);
+            $matQuery->whereHas('vendor', function ($builder) use ($request) {
+                $builder->where('project_id', $request->project_id);
             });
         }
 
         $income = (float) (clone $query)->where('type', 'income')->sum('amount');
         $expense = (float) (clone $query)->where('type', 'expense')->sum('amount');
         $prepayment = (float) (clone $query)->where('type', 'pre-payment')->sum('amount');
-        
-        // 3. THE NEW CHART DATA: Project-Wise Monthly Expense Breakdown
-        // FIXED: Added explicit 'transactions.' prefixes to prevent SQL ambiguous column errors
-        $trendQuery = Transaction::leftJoin('projects', 'transactions.project_id', '=', 'projects.id')
+
+        $projectMonthlyStats = Transaction::leftJoin('projects', 'transactions.project_id', '=', 'projects.id')
             ->select(
                 DB::raw('MONTHNAME(transactions.date) as month'),
                 DB::raw('MONTH(transactions.date) as month_num'),
@@ -52,29 +52,36 @@ class FinanceController extends Controller {
                 DB::raw('SUM(transactions.amount) as cost')
             )
             ->whereIn('transactions.type', ['expense', 'pre-payment'])
-            ->where('transactions.date', '>=', Carbon::now()->subMonths(6));
-
-        if ($request->filled('project_id')) {
-            $trendQuery->where('transactions.project_id', $request->project_id);
-        }
-
-        $projectMonthlyStats = $trendQuery
+            ->where('transactions.date', '>=', Carbon::now()->subMonths(6))
+            ->when($request->filled('project_id'), function ($builder) use ($request) {
+                $builder->where('transactions.project_id', $request->project_id);
+            })
             ->groupBy('month', 'month_num', 'projects.name')
-            ->orderBy('month_num', 'asc')
+            ->orderBy('month_num')
             ->get();
 
-        // 4. DEEP DIVES
+        $monthlyStats = Transaction::select(
+            DB::raw('DATE_FORMAT(date, "%b") as month'),
+            DB::raw('MONTH(date) as month_num'),
+            DB::raw('SUM(CASE WHEN type = "income" THEN amount ELSE 0 END) as income'),
+            DB::raw('SUM(CASE WHEN type IN ("expense", "pre-payment") THEN amount ELSE 0 END) as expense')
+        )
+            ->where('date', '>=', Carbon::now()->subMonths(6))
+            ->groupBy('month', 'month_num')
+            ->orderBy('month_num')
+            ->get();
+
         $categoryBreakdown = (clone $query)
             ->select('category', DB::raw('SUM(amount) as total'))
-            ->whereIn('type',['expense', 'pre-payment'])
+            ->whereIn('type', ['expense', 'pre-payment'])
             ->groupBy('category')
-            ->orderBy('total', 'desc')
+            ->orderByDesc('total')
             ->get();
 
         $materialBreakdown = (clone $matQuery)
             ->select('material_name', DB::raw('SUM(total_price) as total_cost'))
             ->groupBy('material_name')
-            ->orderBy('total_cost', 'desc')
+            ->orderByDesc('total_cost')
             ->get();
 
         return response()->json([
@@ -82,18 +89,23 @@ class FinanceController extends Controller {
             'total_income' => $income,
             'total_expense' => $expense,
             'total_prepayment' => $prepayment,
-            'project_monthly_stats' => $projectMonthlyStats, 
+            'monthly_stats' => $monthlyStats,
+            'project_monthly_stats' => $projectMonthlyStats,
             'category_breakdown' => $categoryBreakdown,
             'material_breakdown' => $materialBreakdown,
-            'recent_transactions' => (clone $query)->orderBy('date', 'desc')->take(5)->get()
+            'recent_transactions' => (clone $query)->orderByDesc('date')->take(5)->get(),
         ]);
     }
 
-    public function getVendors() {
-        return response()->json(Vendor::with(['materials', 'project'])->orderBy('created_at', 'desc')->get());
+    public function getVendors()
+    {
+        return response()->json(
+            Vendor::with(['materials', 'project'])->orderByDesc('created_at')->get()
+        );
     }
 
-    public function storeVendor(Request $request) {
+    public function storeVendor(Request $request)
+    {
         $data = $request->validate([
             'name' => 'required|string',
             'project_id' => 'required|exists:projects,id',
@@ -109,60 +121,64 @@ class FinanceController extends Controller {
             'name' => $data['name'],
             'project_id' => $data['project_id'],
             'contact_person' => $request->input('contact_person'),
-            'phone' => $request->input('phone')
+            'phone' => $request->input('phone'),
         ]);
 
-        foreach ($data['materials'] as $mat) {
+        foreach ($data['materials'] as $material) {
             VendorMaterial::create([
                 'vendor_id' => $vendor->id,
-                'material_name' => $mat['material_name'],
-                'unit_price' => $mat['unit_price'],
-                'quantity' => $mat['quantity'],
-                'total_price' => $mat['unit_price'] * $mat['quantity']
+                'material_name' => $material['material_name'],
+                'unit_price' => $material['unit_price'],
+                'quantity' => $material['quantity'],
+                'total_price' => $material['unit_price'] * $material['quantity'],
             ]);
         }
+
         return response()->json($vendor->load(['materials', 'project']));
     }
 
-    public function getEmployees() {
+    public function getEmployees()
+    {
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
 
-        $employees = Employee::orderBy('name', 'asc')->get()->map(function ($emp) use ($currentMonth, $currentYear) {
-            $descriptionPrefix = "Salary payment for " . $emp->name;
-            $paidThisMonth = Transaction::where('category', 'Salary')
+        $employees = Employee::orderBy('name')->get()->map(function ($employee) use ($currentMonth, $currentYear) {
+            $descriptionPrefix = 'Salary payment for ' . $employee->name;
+            $employee->paid_this_month = Transaction::where('category', 'Salary')
                 ->where('description', 'LIKE', $descriptionPrefix . '%')
                 ->whereMonth('date', $currentMonth)
                 ->whereYear('date', $currentYear)
                 ->exists();
 
-            $emp->paid_this_month = $paidThisMonth;
-            return $emp;
+            return $employee;
         });
 
         return response()->json($employees);
     }
 
-    public function storeEmployee(Request $request) {
+    public function storeEmployee(Request $request)
+    {
         if ($request->user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
+
         $data = $request->validate([
             'name' => 'required|string',
             'role' => 'required|string',
             'salary_amount' => 'required|numeric|min:0',
             'join_date' => 'required|date',
         ]);
+
         return response()->json(Employee::create($data));
     }
 
-    public function paySalary(Request $request, $id) {
+    public function paySalary(Request $request, $id)
+    {
         $employee = Employee::findOrFail($id);
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
         $monthLabel = Carbon::now()->format('F Y');
-        
-        $descriptionPrefix = "Salary payment for " . $employee->name;
+        $descriptionPrefix = 'Salary payment for ' . $employee->name;
 
         $alreadyPaid = Transaction::where('category', 'Salary')
             ->where('description', 'LIKE', $descriptionPrefix . '%')
@@ -171,33 +187,55 @@ class FinanceController extends Controller {
             ->exists();
 
         if ($alreadyPaid) {
-            return response()->json(['message' => 'Salary already paid for ' . $employee->name . ' this month.'], 422);
+            return response()->json([
+                'message' => 'Salary already paid for ' . $employee->name . ' this month.',
+            ], 422);
         }
-        
+
         $transaction = Transaction::create([
             'type' => 'expense',
             'amount' => $employee->salary_amount,
             'category' => 'Salary',
             'date' => Carbon::now()->toDateString(),
-            'description' => $descriptionPrefix . " - " . $monthLabel,
+            'description' => $descriptionPrefix . ' - ' . $monthLabel,
         ]);
 
         $user = User::where('name', $employee->name)->first();
         if ($user) {
             $user->notify(new SalaryPaid((float) $employee->salary_amount, $monthLabel));
         }
-        return response()->json(['message' => 'Salary processed', 'transaction' => $transaction]);
+
+        return response()->json([
+            'message' => 'Salary processed',
+            'transaction' => $transaction,
+        ]);
     }
 
-    public function storeTransaction(Request $request) {
+    public function storeTransaction(Request $request)
+    {
         $validated = $request->validate([
             'type' => 'required|in:income,expense,pre-payment',
             'amount' => 'required|numeric|min:0',
             'category' => 'required|string',
             'date' => 'required|date',
             'description' => 'nullable|string',
-            'project_id' => 'nullable|exists:projects,id'
+            'project_id' => 'nullable|exists:projects,id',
         ]);
+
         return response()->json(Transaction::create($validated));
+    }
+
+    public function getMonthlyReports(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json(
+            MonthlyReport::query()
+                ->orderByDesc('year')
+                ->orderByDesc('month_number')
+                ->get()
+        );
     }
 }

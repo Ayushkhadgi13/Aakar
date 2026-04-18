@@ -12,6 +12,8 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       { path: '/finance',         component: () => import('./components/Finance.vue') },
+      { path: '/vendors',         component: () => import('./components/Vendors.vue') },
+      { path: '/reports/monthly', component: () => import('./components/MonthlyReports.vue') },
       { path: '/projects',        component: () => import('./components/Projects.vue') },
       { path: '/projects/:id',    component: () => import('./components/ProjectDetails.vue') },
       { path: '/tasks',           component: () => import('./components/Tasks.vue') },

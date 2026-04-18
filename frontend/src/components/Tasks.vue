@@ -4,7 +4,7 @@
       <div class="header-left">
         <span class="eyebrow">Task workspace</span>
         <h1>My Tasks</h1>
-        <p>Track what needs attention and keep team handoffs tidy.</p>
+        <p>Track what needs attention and keep project handoffs assigned to the right team members.</p>
       </div>
       <div class="header-right">
         <div class="header-stats">
@@ -21,7 +21,7 @@
       </div>
     </header>
 
-    <div class="task-sections" :class="{'single-col': !isAdmin}">
+    <div class="task-sections" :class="{ 'single-col': !isAdmin }">
       <section class="task-column">
         <div class="column-header">
           <div>
@@ -32,13 +32,12 @@
 
         <div class="column-body">
           <div v-if="myTasks.length === 0" class="empty-state">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             <p>No tasks currently assigned to you.</p>
           </div>
 
           <article v-for="task in myTasks" :key="task.id" class="task-card">
             <div class="card-topline">
-              <span class="meta-kicker">Assigned by {{ task.creator?.name || 'Unknown' }}</span>
+              <span class="meta-kicker">{{ task.project?.name || 'General Task' }}</span>
               <span :class="['status-badge', task.status.toLowerCase().replace(' ', '-')]">{{ task.status }}</span>
             </div>
             <div class="card-header">
@@ -75,19 +74,18 @@
         <div class="column-header">
           <div>
             <h3 class="col-title">Assigned by Me</h3>
-            <p class="col-subtitle">A lightweight view of delegated work and due dates.</p>
+            <p class="col-subtitle">A focused view of delegated work by project and due date.</p>
           </div>
         </div>
 
         <div class="column-body">
           <div v-if="assignedByMe.length === 0" class="empty-state">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
             <p>You haven't assigned any tasks.</p>
           </div>
 
           <article v-for="task in assignedByMe" :key="task.id" class="task-card">
             <div class="card-topline">
-              <span class="meta-kicker">Assigned to {{ task.assignee?.name || 'Unknown' }}</span>
+              <span class="meta-kicker">{{ task.project?.name || 'General Task' }}</span>
               <span :class="['status-badge', task.status.toLowerCase().replace(' ', '-')]">{{ task.status }}</span>
             </div>
             <div class="card-header">
@@ -97,12 +95,12 @@
 
             <div class="meta-container">
               <div class="meta-row">
-                <span class="meta-label">Due</span>
-                <strong>{{ formatDateDisplay(task.due_date) }}</strong>
-              </div>
-              <div class="meta-row">
                 <span class="meta-label">Owner</span>
                 <strong>{{ task.assignee?.name || 'Unknown' }}</strong>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Due</span>
+                <strong>{{ formatDateDisplay(task.due_date) }}</strong>
               </div>
             </div>
 
@@ -121,13 +119,12 @@
       </section>
     </div>
 
-    <!-- NEW TASK MODAL -->
     <div v-if="showTaskModal" class="modal-backdrop" @click.self="showTaskModal = false">
       <div class="modal-card">
         <div class="modal-header">
           <h3>Assign New Task</h3>
           <button @click="showTaskModal = false" class="close-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
         <form @submit.prevent="saveTask">
@@ -139,14 +136,23 @@
             <label>Description</label>
             <textarea v-model="form.description" class="styled-input" rows="3" placeholder="Provide specific details about the assignment..."></textarea>
           </div>
+          <div class="form-group">
+            <label>Project</label>
+            <div class="select-wrapper">
+              <select v-model="form.project_id" class="styled-input" required @change="loadProjectMembers">
+                <option value="" disabled>Select Project</option>
+                <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+              </select>
+            </div>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Assign To</label>
               <div class="select-wrapper">
-                <select v-model="form.assigned_to" class="styled-input" required>
-                  <option value="" disabled>Select User</option>
-                  <option v-for="u in users" :key="u.id" :value="u.id">
-                    {{ u.name }} ({{ u.role }})
+                <select v-model="form.assigned_to" class="styled-input" required :disabled="memberOptions.length === 0">
+                  <option value="" disabled>{{ memberOptions.length ? 'Select User' : 'Select a project first' }}</option>
+                  <option v-for="user in memberOptions" :key="user.id" :value="user.id">
+                    {{ user.name }} ({{ user.role }})
                   </option>
                 </select>
               </div>
@@ -154,10 +160,10 @@
             <div class="form-group">
               <label>Due Date</label>
               <div class="custom-date-box" @click="openPicker(dueDateRef)">
-                <span :class="{'text-placeholder': !form.due_date}">
+                <span :class="{ 'text-placeholder': !form.due_date }">
                   {{ form.due_date ? formatDateDisplay(form.due_date) : 'mm/dd/yyyy' }}
                 </span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <input type="date" ref="dueDateRef" v-model="form.due_date" required class="hidden-date-input" />
               </div>
             </div>
@@ -172,23 +178,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import axios from 'axios';
 import { useAuth } from '../useAuth';
 
 const { isAdmin, loadUser } = useAuth();
 const myTasks = ref([]);
 const assignedByMe = ref([]);
-const users = ref([]);
+const projects = ref([]);
+const memberOptions = ref([]);
 const showTaskModal = ref(false);
 const isSaving = ref(false);
-const form = ref({ title: '', description: '', assigned_to: '', due_date: '' });
-
+const form = ref({ title: '', description: '', project_id: '', assigned_to: '', due_date: '' });
 const dueDateRef = ref(null);
 
-// ----------------------------------------------------
-// CALENDAR LOGIC
-// ----------------------------------------------------
 const openPicker = (inputElement) => {
   const target = inputElement?.value || inputElement;
   if (target && typeof target.showPicker === 'function') {
@@ -204,30 +207,37 @@ const formatDateDisplay = (dateStr) => {
   return `${month}/${day}/${year}`;
 };
 
-// ----------------------------------------------------
-// DATA FETCHING & ACTIONS
-// ----------------------------------------------------
 const loadPageData = async () => {
-  try {
-    await loadUser();
-    const taskRes = await axios.get('/tasks');
-    myTasks.value = taskRes.data.my_tasks;
-    assignedByMe.value = taskRes.data.assigned_by_me || [];
-  } catch (e) {
-    console.error("Failed to load task data", e);
+  await loadUser();
+  const [taskRes, projectRes] = await Promise.all([
+    axios.get('/tasks'),
+    isAdmin.value ? axios.get('/projects') : Promise.resolve({ data: [] }),
+  ]);
+
+  myTasks.value = taskRes.data.my_tasks;
+  assignedByMe.value = taskRes.data.assigned_by_me || [];
+  projects.value = projectRes.data;
+};
+
+const loadProjectMembers = async () => {
+  form.value.assigned_to = '';
+  if (!form.value.project_id) {
+    memberOptions.value = [];
+    return;
   }
+
+  const response = await axios.get(`/projects/${form.value.project_id}/members`);
+  memberOptions.value = response.data;
 };
 
 const openAssignModal = async () => {
-  if (users.value.length === 0) {
-    try {
-      const res = await axios.get('/users-list');
-      users.value = res.data;
-    } catch (e) {
-      alert("Failed to load users list.");
-      return;
-    }
+  if (projects.value.length === 0) {
+    const response = await axios.get('/projects');
+    projects.value = response.data;
   }
+
+  form.value = { title: '', description: '', project_id: '', assigned_to: '', due_date: '' };
+  memberOptions.value = [];
   showTaskModal.value = true;
 };
 
@@ -236,10 +246,11 @@ const saveTask = async () => {
   try {
     await axios.post('/tasks', form.value);
     showTaskModal.value = false;
-    form.value = { title: '', description: '', assigned_to: '', due_date: '' };
-    loadPageData();
-  } catch (e) { 
-    alert("Failed to assign task"); 
+    form.value = { title: '', description: '', project_id: '', assigned_to: '', due_date: '' };
+    memberOptions.value = [];
+    await loadPageData();
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to assign task');
   } finally {
     isSaving.value = false;
   }
@@ -248,8 +259,8 @@ const saveTask = async () => {
 const updateStatus = async (task) => {
   try {
     await axios.put(`/tasks/${task.id}`, { status: task.status });
-  } catch (e) { 
-    alert("Update failed"); 
+  } catch (error) {
+    alert('Update failed');
   }
 };
 
@@ -257,7 +268,6 @@ onMounted(loadPageData);
 </script>
 
 <style scoped>
-/* PAGE LAYOUT */
 .tasks-page { padding: 40px; max-width: 1280px; margin: 0 auto; animation: fadeIn 0.3s ease-out; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 32px; }
 .eyebrow { display: inline-block; margin-bottom: 10px; color: var(--primary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -269,7 +279,6 @@ onMounted(loadPageData);
 .stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .stat-chip strong { font-size: 1.1rem; color: var(--text-main); line-height: 1; }
 
-/* TASK COLUMNS */
 .task-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; }
 .task-sections.single-col { grid-template-columns: minmax(320px, 820px); justify-content: center; }
 .task-column { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; min-height: 100%; }
@@ -278,85 +287,55 @@ onMounted(loadPageData);
 .col-title { font-size: 1.05rem; color: var(--text-main); margin: 0 0 6px 0; font-weight: 700; letter-spacing: -0.02em; }
 .col-subtitle { margin: 0; color: var(--text-secondary); font-size: 0.88rem; }
 
-/* EMPTY STATE */
-.empty-state { text-align: center; padding: 56px 20px; background: transparent; border-radius: 14px; border: 1px dashed var(--border); color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.empty-icon { color: var(--text-muted); opacity: 0.45; }
-
-/* TASK CARDS */
-.task-card { background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-input) 18%); border: 1px solid var(--border); border-radius: 16px; padding: 18px; transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; display: flex; flex-direction: column; gap: 14px; }
-.task-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--primary) 45%, var(--border) 55%); box-shadow: 0 16px 24px -20px rgba(0, 0, 0, 0.35); }
+.empty-state { text-align: center; padding: 56px 20px; border: 1px dashed var(--border); border-radius: 14px; color: var(--text-secondary); }
+.task-card { background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-input) 18%); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .card-topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .meta-kicker { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-.card-header { display: flex; justify-content: space-between; align-items: flex-start; }
 .card-header h4 { margin: 0; font-size: 1.05rem; color: var(--text-main); font-weight: 700; line-height: 1.35; }
-
-/* STATUS BADGE */
 .status-badge { padding: 6px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .pending { background: rgba(245, 158, 11, 0.12); color: #d97706; }
 .in-progress { background: rgba(166, 93, 67, 0.12); color: var(--primary); }
 .completed { background: rgba(16, 185, 129, 0.12); color: #059669; }
-
 .task-desc { font-size: 0.93rem; color: var(--text-body); margin: 0; line-height: 1.6; white-space: pre-wrap; }
-
-/* META DATA */
 .meta-container { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .meta-row { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--bg-input); border: 1px solid var(--border); }
 .meta-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .meta-row strong { color: var(--text-main); font-size: 0.92rem; font-weight: 600; }
-
-/* CARD ACTIONS */
-.card-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 2px; }
+.card-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .card-actions label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
 
-/* =========================================
-   GLOBAL INPUT RESET & CUSTOM STYLING 
-   ========================================= */
-.styled-input {
-  appearance: none; -webkit-appearance: none; width: 100%; height: 48px; padding: 12px 16px; background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--text-main); font-family: inherit; font-size: 1rem; transition: all 0.2s ease; box-sizing: border-box;
-}
+.styled-input { appearance: none; -webkit-appearance: none; width: 100%; min-height: 48px; padding: 12px 16px; background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--text-main); font-family: inherit; font-size: 1rem; transition: all 0.2s ease; box-sizing: border-box; }
 textarea.styled-input { height: auto; }
 .styled-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1); background: var(--bg-surface); }
 .styled-input.small { height: 40px; min-width: 160px; padding: 6px 36px 6px 12px; font-size: 0.85rem; font-weight: 600; background: var(--bg-surface); }
 
-/* SVG WRAPPERS */
 .select-wrapper { position: relative; width: 100%; }
 .select-wrapper::after { content: ''; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-size: contain; pointer-events: none; }
 .select-wrapper.small::after { right: 10px; width: 14px; height: 14px; }
 .select-wrapper select { padding-right: 48px; cursor: pointer; }
 
-/* POP-OUT DATE PICKER */
-.custom-date-box {
-  position: relative; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px; background: transparent; cursor: pointer; transition: all 0.2s ease;
-}
+.custom-date-box { position: relative; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px; background: transparent; cursor: pointer; transition: all 0.2s ease; }
 .custom-date-box:hover { border-color: var(--primary); }
 .custom-date-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1); background: var(--bg-surface); }
 .custom-date-box span { font-size: 1rem; color: var(--text-main); pointer-events: none; }
 .custom-date-box span.text-placeholder { color: var(--text-muted); }
-.custom-date-box svg { color: var(--text-secondary); pointer-events: none; }
-.hidden-date-input { position: absolute; top: 100%; left: 0; width: 0; height: 0; opacity: 0; padding: 0; margin: 0; border: none; pointer-events: none; }
+.hidden-date-input { position: absolute; top: 100%; left: 0; width: 0; height: 0; opacity: 0; border: none; pointer-events: none; }
 
-
-/* =========================================
-   MODALS
-   ========================================= */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: fadeIn 0.2s ease; padding: 20px; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
 .modal-card { background: var(--bg-surface); padding: 32px; border-radius: 18px; width: 500px; border: 1px solid var(--border); box-shadow: 0 24px 50px rgba(0,0,0,0.12); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
 .modal-header h3 { color: var(--text-main); margin: 0; font-size: 1.4rem; font-weight: 800; }
 .close-btn { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: 0.2s; }
 .close-btn:hover { background: var(--bg-input); color: var(--text-main); }
-
-/* FORMS IN MODALS */
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .form-group { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
 .form-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
 
-/* BUTTONS */
 .btn { padding: 0 24px; height: 46px; border-radius: 10px; font-weight: 700; font-size: 0.94rem; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; letter-spacing: 0.2px; }
 .btn.primary { background: var(--primary); color: white; }
 .btn.primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(166, 93, 67, 0.2); }
 .btn.primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.full-width { width: 100%; margin-top: 10px;}
+.full-width { width: 100%; margin-top: 10px; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -371,8 +350,6 @@ textarea.styled-input { height: auto; }
   .tasks-page { padding: 24px 20px; }
   .task-sections,
   .task-sections.single-col { grid-template-columns: 1fr; }
-  .column-header { padding: 20px; }
-  .column-body { padding: 14px; }
   .meta-container { grid-template-columns: 1fr; }
   .card-actions { flex-direction: column; align-items: stretch; }
   .form-row { grid-template-columns: 1fr; gap: 0; }

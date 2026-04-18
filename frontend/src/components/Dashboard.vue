@@ -13,6 +13,8 @@
         <div class="nav-links">
           <button @click="router.push('/dashboard')" :class="['nav-item', { active: $route.path === '/dashboard' }]">Overview</button>
           <button v-if="user?.role === 'admin'" @click="router.push('/finance')" :class="['nav-item', { active: $route.path === '/finance' }]">Finance</button>
+          <button v-if="user?.role === 'admin'" @click="router.push('/vendors')" :class="['nav-item', { active: $route.path === '/vendors' }]">Vendors</button>
+          <button v-if="user?.role === 'admin'" @click="router.push('/reports/monthly')" :class="['nav-item', { active: $route.path === '/reports/monthly' }]">Reports</button>
           <button @click="router.push('/projects')" :class="['nav-item', { active: $route.path.startsWith('/projects') }]">Projects</button>
           <button @click="router.push('/tasks')" :class="['nav-item', { active: $route.path === '/tasks' }]">Tasks</button>
           <button v-if="user?.role === 'admin'" @click="router.push('/employees')" :class="['nav-item', { active: $route.path === '/employees' }]">Employees</button>
