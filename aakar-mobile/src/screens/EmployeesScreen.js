@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../api/axios';
+import { colors, shadows } from '../theme';
 
 export default function EmployeesScreen() {
   const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchEmps = async () => {
       try {
         const res = await api.get('/system/employees');
         setEmployees(res.data.users);
-      } catch (e) { console.log(e); }
+      } catch (e) {
+        console.log(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchEmps();
   }, []);
@@ -26,27 +33,57 @@ export default function EmployeesScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.pageTitle}>Employees</Text>
-      <FlatList 
+    <SafeAreaView style={styles.safeArea}>
+      <FlatList
+        style={styles.container}
         data={employees}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
+        ListHeaderComponent={(
+          <View style={styles.header}>
+            <Text style={styles.eyebrow}>Team workspace</Text>
+            <Text style={styles.pageTitle}>Employees</Text>
+            <Text style={styles.pageSub}>A lightweight directory of active staff accounts.</Text>
+          </View>
+        )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB', padding: 20, paddingTop: 50 },
-  pageTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, elevation: 1 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#A65D43', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  avatarText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+  header: { marginTop: 8, marginBottom: 18 },
+  eyebrow: { fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
+  pageTitle: { fontSize: 30, fontWeight: '900', color: colors.text },
+  pageSub: { fontSize: 14, color: colors.textSoft, marginTop: 6, lineHeight: 21 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.soft,
+  },
+  avatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  avatarText: { color: 'white', fontWeight: '800', fontSize: 18 },
   info: { flex: 1 },
-  name: { fontWeight: 'bold', fontSize: 16 },
-  email: { color: '#64748B', fontSize: 12 },
-  roleBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  roleText: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', color: '#111827' }
+  name: { fontWeight: '800', fontSize: 16, color: colors.text },
+  email: { color: colors.textSoft, fontSize: 12, marginTop: 3 },
+  roleBadge: { backgroundColor: colors.surfaceMuted, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
+  roleText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', color: colors.text },
 });

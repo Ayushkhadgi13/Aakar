@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Home, FolderGit2, CheckSquare, DollarSign, Users, LogOut, Truck } from 'lucide-react-native';
+import { colors } from '../theme';
 
 import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
@@ -31,18 +32,41 @@ function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#A65D43',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#E2E8F0',
-          elevation: 5,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 78,
+          paddingTop: 8,
+          paddingBottom: 10,
         },
-        headerStyle: { backgroundColor: '#fff' },
-        headerTintColor: '#111827',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.3,
+        },
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+        headerShadowVisible: false,
+        headerTitleStyle: {
+          fontSize: 18,
+          fontWeight: '800',
+        },
         headerRight: () => (
-          <TouchableOpacity onPress={logout} style={{ marginRight: 15 }}>
-            <LogOut color="#EF4444" size={22} />
+          <TouchableOpacity
+            onPress={logout}
+            style={{
+              marginRight: 16,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.dangerSoft,
+            }}
+          >
+            <LogOut color={colors.danger} size={18} />
           </TouchableOpacity>
         ),
       }}
@@ -110,8 +134,8 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}>
-        <ActivityIndicator size="large" color="#A65D43" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

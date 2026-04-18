@@ -1,22 +1,30 @@
 import React, { useContext, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
-  RefreshControl, Dimensions, ActivityIndicator
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
+import { colors, shadows } from '../theme';
 
-const screenWidth = Dimensions.get('window').width - 40;
+const screenWidth = Dimensions.get('window').width - 56;
 
 const chartConfig = {
-  backgroundGradientFrom: '#ffffff',
-  backgroundGradientTo: '#ffffff',
+  backgroundGradientFrom: colors.surface,
+  backgroundGradientTo: colors.surface,
   decimalPlaces: 0,
   color: (opacity = 1) => `rgba(166, 93, 67, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-  style: { borderRadius: 16 },
-  propsForDots: { r: '4', strokeWidth: '2', stroke: '#A65D43' },
+  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+  style: { borderRadius: 20 },
+  propsForDots: { r: '4', strokeWidth: '2', stroke: colors.primary },
+  propsForBackgroundLines: { stroke: colors.border, strokeDasharray: '' },
 };
 
 export default function DashboardScreen() {
@@ -50,12 +58,14 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  useEffect(() => { fetchDashboard(); }, []);
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#A65D43" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -63,7 +73,7 @@ export default function DashboardScreen() {
   const buildMonthlyChart = () => {
     const transactions = data?.recent_transactions || [];
     const months = {};
-    transactions.forEach(tx => {
+    transactions.forEach((tx) => {
       const month = tx.date?.slice(0, 7);
       if (!month) return;
       if (!months[month]) months[month] = { income: 0, expense: 0 };
@@ -73,233 +83,245 @@ export default function DashboardScreen() {
     const keys = Object.keys(months).sort().slice(-5);
     if (keys.length === 0) return null;
     return {
-      labels: keys.map(k => k.slice(5)),
+      labels: keys.map((k) => k.slice(5)),
       datasets: [
-        { data: keys.map(k => months[k].income), color: (o = 1) => `rgba(16,185,129,${o})`, strokeWidth: 2 },
-        { data: keys.map(k => months[k].expense), color: (o = 1) => `rgba(239,68,68,${o})`, strokeWidth: 2 },
+        { data: keys.map((k) => months[k].income), color: (o = 1) => `rgba(16,185,129,${o})`, strokeWidth: 2 },
+        { data: keys.map((k) => months[k].expense), color: (o = 1) => `rgba(239,68,68,${o})`, strokeWidth: 2 },
       ],
       legend: ['Income', 'Expense'],
     };
   };
 
-  const buildTaskChart = () => {
-    if (!data) return null;
-    return {
-      labels: ['Pending', 'In Progress', 'Done'],
-      datasets: [{
-        data: [
-          data.pending_count || 0,
-          data.in_progress_count || 0,
-          data.completed_count || 0,
-        ],
-      }],
-    };
-  };
+  const buildTaskChart = () => ({
+    labels: ['Pending', 'In Progress', 'Done'],
+    datasets: [{
+      data: [
+        data?.pending_count || 0,
+        data?.in_progress_count || 0,
+        data?.completed_count || 0,
+      ],
+    }],
+  });
 
   const monthlyChart = user?.role === 'admin' ? buildMonthlyChart() : null;
   const taskChart = user?.role !== 'admin' ? buildTaskChart() : null;
   const net = (data?.total_income || 0) - (data?.total_expense || 0);
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#A65D43" />}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
-        <Text style={styles.subGreeting}>Here is your daily summary</Text>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>Daily overview</Text>
+          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]}</Text>
+          <Text style={styles.subGreeting}>
+            {user?.role === 'admin'
+              ? 'A clear snapshot of revenue, expenses, and vendors.'
+              : 'A focused view of your work and current task load.'}
+          </Text>
+        </View>
 
-      {user?.role === 'admin' ? (
-        <>
-          {/* KPI Cards */}
-          <View style={styles.kpiRow}>
-            <View style={[styles.kpiCard, { borderLeftColor: '#10B981' }]}>
-              <Text style={styles.kpiLabel}>TOTAL REVENUE</Text>
-              <Text style={[styles.kpiValue, { color: '#10B981' }]}>
-                Rs. {Number(data?.total_income || 0).toLocaleString()}
-              </Text>
-            </View>
-            <View style={[styles.kpiCard, { borderLeftColor: '#EF4444' }]}>
-              <Text style={styles.kpiLabel}>TOTAL EXPENSES</Text>
-              <Text style={[styles.kpiValue, { color: '#EF4444' }]}>
-                Rs. {Number(data?.total_expense || 0).toLocaleString()}
-              </Text>
-            </View>
-          </View>
-
-          {/* Net Balance */}
-          <View style={[styles.netCard, { backgroundColor: net >= 0 ? '#ECFDF5' : '#FEF2F2' }]}>
-            <Text style={styles.netLabel}>NET BALANCE</Text>
-            <Text style={[styles.netValue, { color: net >= 0 ? '#10B981' : '#EF4444' }]}>
-              {net >= 0 ? '+' : ''}Rs. {Math.abs(net).toLocaleString()}
-            </Text>
-            <Text style={styles.netSub}>{net >= 0 ? 'Profitable' : 'Over Budget'}</Text>
-          </View>
-
-          {/* Monthly Chart */}
-          {monthlyChart ? (
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Income vs Expense</Text>
-              <Text style={styles.chartSub}>Last {monthlyChart.labels.length} months</Text>
-              <LineChart
-                data={monthlyChart}
-                width={screenWidth}
-                height={200}
-                chartConfig={chartConfig}
-                bezier
-                style={styles.chart}
-                withInnerLines={false}
-                withOuterLines={false}
-                legend={monthlyChart.legend}
-              />
-            </View>
-          ) : (
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Income vs Expense</Text>
-              <View style={styles.noDataBox}>
-                <Text style={styles.noDataText}>No transaction data yet</Text>
+        {user?.role === 'admin' ? (
+          <>
+            <View style={styles.kpiGrid}>
+              <View style={[styles.kpiCard, styles.kpiCardWide]}>
+                <Text style={styles.kpiLabel}>Total Revenue</Text>
+                <Text style={[styles.kpiValue, { color: colors.success }]}>
+                  Rs. {Number(data?.total_income || 0).toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Expenses</Text>
+                <Text style={[styles.kpiValueSmall, { color: colors.danger }]}>
+                  Rs. {Number(data?.total_expense || 0).toLocaleString()}
+                </Text>
               </View>
             </View>
-          )}
 
-          {/* Vendors */}
-          {data?.vendors?.length > 0 && (
+            <View style={[styles.highlightCard, { backgroundColor: net >= 0 ? colors.successSoft : colors.dangerSoft }]}>
+              <Text style={styles.highlightLabel}>Net Balance</Text>
+              <Text style={[styles.highlightValue, { color: net >= 0 ? colors.success : colors.danger }]}>
+                {net >= 0 ? '+' : '-'}Rs. {Math.abs(net).toLocaleString()}
+              </Text>
+              <Text style={styles.highlightSub}>{net >= 0 ? 'Operating healthy this period' : 'Expenses are running high'}</Text>
+            </View>
+
             <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Vendors</Text>
-              <Text style={styles.chartSub}>{data.vendors.length} registered vendors</Text>
-              {data.vendors.slice(0, 5).map((vendor, i) => (
-                <View key={vendor.id || i} style={styles.txRow}>
-                  <View style={[styles.txIcon, { backgroundColor: '#EFF6FF' }]}>
-                    <Text>🏢</Text>
-                  </View>
-                  <View style={styles.txInfo}>
-                    <Text style={styles.txCat}>{vendor.name}</Text>
-                    <Text style={styles.txDate}>{vendor.contact || vendor.phone || 'No contact info'}</Text>
-                  </View>
-                  <View style={styles.vendorBadge}>
-                    <Text style={styles.vendorBadgeText}>Active</Text>
-                  </View>
+              <Text style={styles.chartTitle}>Income vs Expense</Text>
+              <Text style={styles.chartSub}>Recent monthly movement</Text>
+              {monthlyChart ? (
+                <LineChart
+                  data={monthlyChart}
+                  width={screenWidth}
+                  height={220}
+                  chartConfig={chartConfig}
+                  bezier
+                  style={styles.chart}
+                  withInnerLines={false}
+                  withOuterLines={false}
+                  legend={monthlyChart.legend}
+                />
+              ) : (
+                <View style={styles.noDataBox}>
+                  <Text style={styles.noDataText}>No transaction data yet</Text>
                 </View>
-              ))}
+              )}
             </View>
-          )}
 
-          {/* Recent Transactions */}
-          {data?.recent_transactions?.length > 0 && (
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Recent Transactions</Text>
-              {data.recent_transactions.slice(0, 5).map((tx, i) => (
-                <View key={tx.id || i} style={styles.txRow}>
-                  <View style={[styles.txIcon, { backgroundColor: tx.type === 'income' ? '#ECFDF5' : '#FEF2F2' }]}>
-                    <Text>{tx.type === 'income' ? '↑' : '↓'}</Text>
-                  </View>
-                  <View style={styles.txInfo}>
-                    <Text style={styles.txCat}>{tx.category}</Text>
-                    <Text style={styles.txDate}>{tx.date}</Text>
-                  </View>
-                  <Text style={[styles.txAmount, { color: tx.type === 'income' ? '#10B981' : '#EF4444' }]}>
-                    {tx.type === 'income' ? '+' : '-'} Rs. {Number(tx.amount).toLocaleString()}
-                  </Text>
+            {!!data?.vendors?.length && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.chartTitle}>Vendor Directory</Text>
+                  <View style={styles.pill}><Text style={styles.pillText}>{data.vendors.length}</Text></View>
                 </View>
-              ))}
-            </View>
-          )}
-        </>
-      ) : (
-        <>
-          {/* Employee KPI Cards */}
-          <View style={styles.kpiRow}>
-            <View style={[styles.kpiCard, { borderLeftColor: '#EF4444' }]}>
-              <Text style={styles.kpiLabel}>PENDING</Text>
-              <Text style={[styles.kpiValue, { color: '#EF4444' }]}>{data?.pending_count || 0}</Text>
-            </View>
-            <View style={[styles.kpiCard, { borderLeftColor: '#3B82F6' }]}>
-              <Text style={styles.kpiLabel}>IN PROGRESS</Text>
-              <Text style={[styles.kpiValue, { color: '#3B82F6' }]}>{data?.in_progress_count || 0}</Text>
-            </View>
-          </View>
+                {data.vendors.slice(0, 5).map((vendor, i) => (
+                  <View key={vendor.id || i} style={styles.listRow}>
+                    <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+                      <Text style={styles.rowIconText}>V</Text>
+                    </View>
+                    <View style={styles.rowInfo}>
+                      <Text style={styles.rowTitle}>{vendor.name}</Text>
+                      <Text style={styles.rowSub}>{vendor.contact || vendor.phone || 'No contact info'}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
-          <View style={styles.kpiRow}>
-            <View style={[styles.kpiCard, { borderLeftColor: '#10B981', width: '100%' }]}>
-              <Text style={styles.kpiLabel}>COMPLETED</Text>
-              <Text style={[styles.kpiValue, { color: '#10B981' }]}>{data?.completed_count || 0}</Text>
+            {!!data?.recent_transactions?.length && (
+              <View style={styles.card}>
+                <Text style={styles.chartTitle}>Recent Transactions</Text>
+                {data.recent_transactions.slice(0, 5).map((tx, i) => (
+                  <View key={tx.id || i} style={styles.listRow}>
+                    <View style={[styles.rowIcon, { backgroundColor: tx.type === 'income' ? colors.successSoft : colors.dangerSoft }]}>
+                      <Text style={styles.rowIconText}>{tx.type === 'income' ? '+' : '-'}</Text>
+                    </View>
+                    <View style={styles.rowInfo}>
+                      <Text style={styles.rowTitle}>{tx.category}</Text>
+                      <Text style={styles.rowSub}>{tx.date}</Text>
+                    </View>
+                    <Text style={[styles.amountText, { color: tx.type === 'income' ? colors.success : colors.danger }]}>
+                      {tx.type === 'income' ? '+' : '-'} Rs. {Number(tx.amount).toLocaleString()}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            <View style={styles.kpiGrid}>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Pending</Text>
+                <Text style={[styles.kpiValueSmall, { color: colors.danger }]}>{data?.pending_count || 0}</Text>
+              </View>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>In Progress</Text>
+                <Text style={[styles.kpiValueSmall, { color: colors.info }]}>{data?.in_progress_count || 0}</Text>
+              </View>
             </View>
-          </View>
 
-          {/* Task Bar Chart */}
-          {taskChart && (
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Task Overview</Text>
-              <Text style={styles.chartSub}>Status breakdown</Text>
-              <BarChart
-                data={taskChart}
-                width={screenWidth}
-                height={200}
-                chartConfig={{
-                  ...chartConfig,
-                  color: (opacity = 1) => `rgba(166, 93, 67, ${opacity})`,
-                }}
-                style={styles.chart}
-                withInnerLines={false}
-                showValuesOnTopOfBars
-                fromZero
-              />
+            <View style={[styles.highlightCard, { backgroundColor: colors.successSoft }]}>
+              <Text style={styles.highlightLabel}>Completed</Text>
+              <Text style={[styles.highlightValue, { color: colors.success }]}>{data?.completed_count || 0}</Text>
+              <Text style={styles.highlightSub}>Tasks closed successfully</Text>
             </View>
-          )}
-        </>
-      )}
 
-      <View style={{ height: 30 }} />
-    </ScrollView>
+            {taskChart && (
+              <View style={styles.chartCard}>
+                <Text style={styles.chartTitle}>Task Overview</Text>
+                <Text style={styles.chartSub}>Status breakdown</Text>
+                <BarChart
+                  data={taskChart}
+                  width={screenWidth}
+                  height={220}
+                  chartConfig={chartConfig}
+                  style={styles.chart}
+                  withInnerLines={false}
+                  showValuesOnTopOfBars
+                  fromZero
+                />
+              </View>
+            )}
+          </>
+        )}
+
+        <View style={{ height: 30 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB', paddingHorizontal: 20 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { marginTop: 60, marginBottom: 24 },
-  greeting: { fontSize: 28, fontWeight: '800', color: '#111827' },
-  subGreeting: { fontSize: 14, color: '#64748B', marginTop: 4 },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+  header: { marginTop: 10, marginBottom: 22 },
+  eyebrow: { fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 10 },
+  greeting: { fontSize: 30, fontWeight: '900', color: colors.text },
+  subGreeting: { fontSize: 14, color: colors.textSoft, marginTop: 8, lineHeight: 22, maxWidth: 320 },
 
-  kpiRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  kpiGrid: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   kpiCard: {
-    backgroundColor: '#fff', width: '48%', padding: 18,
-    borderRadius: 16, borderLeftWidth: 4,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    flex: 1,
+    backgroundColor: colors.surface,
+    padding: 18,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.soft,
   },
-  kpiLabel: { fontSize: 10, color: '#64748B', fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
-  kpiValue: { fontSize: 22, fontWeight: '800' },
+  kpiCardWide: { flex: 1.3 },
+  kpiLabel: { fontSize: 11, color: colors.textSoft, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  kpiValue: { fontSize: 24, fontWeight: '900' },
+  kpiValueSmall: { fontSize: 22, fontWeight: '900' },
 
-  netCard: {
-    padding: 20, borderRadius: 16, marginBottom: 16,
-    alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
+  highlightCard: {
+    padding: 22,
+    borderRadius: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  netLabel: { fontSize: 10, color: '#64748B', fontWeight: '700', letterSpacing: 1 },
-  netValue: { fontSize: 28, fontWeight: '900', marginTop: 4 },
-  netSub: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
+  highlightLabel: { fontSize: 11, color: colors.textSoft, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  highlightValue: { fontSize: 30, fontWeight: '900', marginTop: 6 },
+  highlightSub: { fontSize: 13, color: colors.textSoft, marginTop: 6 },
 
   chartCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 20,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 20,
     marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
-  chartTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  chartSub: { fontSize: 12, color: '#94A3B8', marginBottom: 12, marginTop: 2 },
-  chart: { borderRadius: 12, marginTop: 8 },
-  noDataBox: { height: 80, justifyContent: 'center', alignItems: 'center' },
-  noDataText: { color: '#94A3B8', fontSize: 14 },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  pill: { backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 },
+  pillText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  chartTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  chartSub: { fontSize: 13, color: colors.textMuted, marginBottom: 12, marginTop: 4 },
+  chart: { borderRadius: 20, marginTop: 8 },
+  noDataBox: { height: 100, justifyContent: 'center', alignItems: 'center' },
+  noDataText: { color: colors.textMuted, fontSize: 14 },
 
-  txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#F1F5F9' },
-  txIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  txInfo: { flex: 1 },
-  txCat: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  txDate: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  txAmount: { fontSize: 14, fontWeight: '700' },
-
-  vendorBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  vendorBadgeText: { fontSize: 11, fontWeight: '700', color: '#10B981' },
+  listRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F3EEE7' },
+  rowIcon: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  rowIconText: { color: colors.primary, fontWeight: '800' },
+  rowInfo: { flex: 1 },
+  rowTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
+  rowSub: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
+  amountText: { fontSize: 14, fontWeight: '800', marginLeft: 10 },
 });

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../api/axios';
+import { colors, shadows } from '../theme';
 
 export default function ProjectsScreen({ navigation }) {
   const [projects, setProjects] = useState([]);
@@ -30,10 +32,10 @@ export default function ProjectsScreen({ navigation }) {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'completed': return '#10B981';
-      case 'in progress': return '#3B82F6';
-      case 'on hold': return '#F59E0B';
-      default: return '#94A3B8';
+      case 'completed': return colors.success;
+      case 'in progress': return colors.primary;
+      case 'on hold': return colors.warning;
+      default: return colors.textMuted;
     }
   };
 
@@ -44,12 +46,12 @@ export default function ProjectsScreen({ navigation }) {
     >
       <View style={styles.cardHeader}>
         <Text style={styles.projectName}>{item.name}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+        <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
           <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
         </View>
       </View>
 
-      <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+      <Text style={styles.description} numberOfLines={2}>{item.description || 'No project description available.'}</Text>
 
       <View style={styles.progressContainer}>
         <View style={styles.progressRow}>
@@ -62,7 +64,7 @@ export default function ProjectsScreen({ navigation }) {
       </View>
 
       <View style={styles.cardFooter}>
-        <Text style={styles.footerText}>📅 {item.start_date} → {item.end_date}</Text>
+        <Text style={styles.footerText}>{item.start_date} -> {item.end_date || 'Ongoing'}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -70,43 +72,62 @@ export default function ProjectsScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#A65D43" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.pageTitle}>Projects</Text>
+    <SafeAreaView style={styles.safeArea}>
       <FlatList
+        style={styles.container}
         data={projects}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        ListHeaderComponent={(
+          <View style={styles.header}>
+            <Text style={styles.eyebrow}>Project workspace</Text>
+            <Text style={styles.pageTitle}>Projects</Text>
+            <Text style={styles.pageSub}>Track progress, status, and build timelines in one place.</Text>
+          </View>
+        )}
         ListEmptyComponent={<Text style={styles.emptyText}>No projects found.</Text>}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB', paddingTop: 50, paddingHorizontal: 20 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  projectName: { fontSize: 16, fontWeight: 'bold', color: '#111827', flex: 1, marginRight: 10 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
-  description: { fontSize: 13, color: '#64748B', marginBottom: 15, lineHeight: 18 },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+  header: { marginTop: 8, marginBottom: 18 },
+  eyebrow: { fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
+  pageTitle: { fontSize: 30, fontWeight: '900', color: colors.text },
+  pageSub: { fontSize: 14, color: colors.textSoft, marginTop: 6, lineHeight: 21, maxWidth: 310 },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 10 },
+  projectName: { fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  statusText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  description: { fontSize: 13, color: colors.textSoft, marginBottom: 15, lineHeight: 19 },
   progressContainer: { marginBottom: 12 },
-  progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressLabel: { fontSize: 12, color: '#64748B', fontWeight: 'bold' },
-  progressValue: { fontSize: 12, color: '#111827', fontWeight: 'bold' },
-  progressBar: { height: 6, backgroundColor: '#E2E8F0', borderRadius: 3 },
-  progressFill: { height: 6, backgroundColor: '#A65D43', borderRadius: 3 },
-  cardFooter: { borderTopWidth: 1, borderColor: '#F1F5F9', paddingTop: 10 },
-  footerText: { fontSize: 12, color: '#94A3B8' },
-  emptyText: { textAlign: 'center', color: '#94A3B8', marginTop: 50, fontSize: 16 },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  progressLabel: { fontSize: 12, color: colors.textSoft, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  progressValue: { fontSize: 12, color: colors.text, fontWeight: '800' },
+  progressBar: { height: 8, backgroundColor: colors.border, borderRadius: 999 },
+  progressFill: { height: 8, backgroundColor: colors.primary, borderRadius: 999 },
+  cardFooter: { borderTopWidth: 1, borderColor: '#F3EEE7', paddingTop: 12 },
+  footerText: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  emptyText: { textAlign: 'center', color: colors.textMuted, marginTop: 50, fontSize: 16 },
 });
