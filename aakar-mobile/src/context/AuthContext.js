@@ -22,7 +22,10 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      const response = await api.post('/login', { email, password });
+      const response = await api.post('/login', {
+        email: email.trim(),
+        password,
+      });
       const token = response.data.access_token;
       setUser(response.data.user);
       setUserToken(token);

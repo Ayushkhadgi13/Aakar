@@ -1,31 +1,63 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Use 10.0.2.2 for Android Emulator, localhost for iOS Simulator
-const BASE_URL = Platform.OS === 'android'
-  ? 'http://10.0.2.2:8000/api'
-  : 'http://localhost:8000/api';
+// Prefer an explicit env override first.
+const ENV_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
+const FALLBACK_LAN_BASE_URL = 'http://192.168.31.16:8000/api';
+const IOS_SIMULATOR_BASE_URL = 'http://localhost:8000/api';
+
+const inferExpoHost = () => {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.debuggerHost;
+
+  if (!hostUri) {
+    return null;
+  }
+
+  const host = hostUri.split(':')[0];
+  return host ? `http://${host}:8000/api` : null;
+};
+
+const getDefaultBaseUrl = () => {
+  const expoHostBaseUrl = inferExpoHost();
+  if (expoHostBaseUrl) {
+    return expoHostBaseUrl;
+  }
+
+  // If Expo host info is unavailable, keep localhost only for iOS simulator style flows.
+  if (Platform.OS === 'ios') {
+    return IOS_SIMULATOR_BASE_URL;
+  }
+
+  return FALLBACK_LAN_BASE_URL;
+};
+
+const BASE_URL = ENV_BASE_URL || getDefaultBaseUrl();
 
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
   headers: {
-    'Accept': 'application/json',
+    Accept: 'application/json',
     'Content-Type': 'application/json',
   },
 });
 
-// Attach token to every request
-api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('userToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => Promise.reject(error));
+api.interceptors.request.use(
+  async (config) => {
+    const token = await SecureStore.getItemAsync('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-// Handle 401 (token expired/invalid) — clear storage so app redirects to login
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -36,4 +68,5 @@ api.interceptors.response.use(
   }
 );
 
+export { BASE_URL };
 export default api;

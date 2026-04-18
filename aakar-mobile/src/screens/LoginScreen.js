@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import { BASE_URL } from '../api/axios';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -11,7 +12,15 @@ export default function LoginScreen() {
     try {
       await login(email, password);
     } catch (error) {
-      Alert.alert('Login Failed', 'Invalid credentials. Please try again.');
+      const backendMessage = error?.response?.data?.message;
+      const networkMessage = error?.message === 'Network Error'
+        ? `Cannot reach the backend at ${BASE_URL}.`
+        : null;
+
+      Alert.alert(
+        'Login Failed',
+        backendMessage || networkMessage || 'Unable to sign in. Please try again.'
+      );
     }
   };
 
