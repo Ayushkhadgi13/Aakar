@@ -2,75 +2,174 @@
   <div class="finance-page">
     <header class="finance-header">
       <div class="header-left">
+        <span class="eyebrow">Finance workspace</span>
         <h1>Finance & Analytics</h1>
-        <p>Manage procurement, view exact expenditures, and process payroll.</p>
+        <p>Manage procurement, track cash flow, and keep payroll operations organized.</p>
       </div>
       <div class="header-right">
+        <div v-if="isAdmin && summary" class="header-stats">
+          <div class="stat-chip">
+            <span class="stat-label">Vendors</span>
+            <strong>{{ vendors.length }}</strong>
+          </div>
+          <div class="stat-chip">
+            <span class="stat-label">Projects</span>
+            <strong>{{ projects.length }}</strong>
+          </div>
+        </div>
         <div v-if="isAdmin" class="action-buttons">
           <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
-          <button @click="showTransactionModal = true" class="btn primary">+ Transaction</button>
+          <button @click="showTransactionModal = true" class="btn primary">Add Transaction</button>
         </div>
       </div>
     </header>
 
     <!-- SEARCH & DATE FILTERS -->
-    <div class="filter-bar" v-if="isAdmin">
-      <div class="filter-item">
+    <div class="filter-panel" v-if="isAdmin">
+      <div class="filter-group project-filter">
         <label>Filter by Project</label>
-        <select v-model="filters.project_id" @change="loadData" class="project-filter">
-          <option value="">All Projects</option>
-          <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-        </select>
+        <div class="select-wrapper">
+          <select v-model="filters.project_id" @change="loadData" class="styled-input">
+            <option value="">All Projects Overview</option>
+            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </div>
       </div>
-      <div class="filter-item">
-        <label>Start Date</label>
-        <input type="date" v-model="filters.start_date" @change="loadData" />
+      
+      <div class="filter-group">
+        <label>Date From</label>
+        <div class="calendar-field" @click.stop>
+          <div class="custom-date-box" :class="{ open: activeCalendar === 'start' }" @click="toggleCalendar('start')">
+            <span :class="{'text-placeholder': !filters.start_date}">
+              {{ filters.start_date ? formatDateDisplay(filters.start_date) : 'Select Start Date' }}
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div v-if="activeCalendar === 'start'" class="calendar-popout">
+            <div class="calendar-header">
+              <button type="button" class="calendar-nav" @click="changeCalendarMonth('start', -1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <strong>{{ getCalendarTitle('start') }}</strong>
+              <button type="button" class="calendar-nav" @click="changeCalendarMonth('start', 1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <span v-for="day in weekdayLabels" :key="day">{{ day }}</span>
+            </div>
+            <div class="calendar-grid">
+              <button
+                v-for="day in getCalendarDays('start')"
+                :key="day.iso"
+                type="button"
+                class="calendar-day"
+                :class="{ muted: !day.isCurrentMonth, selected: day.isSelected, today: day.isToday }"
+                @click="selectCalendarDate('start', day.iso)"
+              >
+                {{ day.dayNumber }}
+              </button>
+            </div>
+            <div class="calendar-footer">
+              <button type="button" class="calendar-link" @click="clearCalendarDate('start')">Clear</button>
+              <button type="button" class="calendar-link" @click="selectToday('start')">Today</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="filter-item">
-        <label>End Date</label>
-        <input type="date" v-model="filters.end_date" @change="loadData" />
+
+      <div class="filter-group">
+        <label>Date To</label>
+        <div class="calendar-field" @click.stop>
+          <div class="custom-date-box" :class="{ open: activeCalendar === 'end' }" @click="toggleCalendar('end')">
+            <span :class="{'text-placeholder': !filters.end_date}">
+              {{ filters.end_date ? formatDateDisplay(filters.end_date) : 'Select End Date' }}
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div v-if="activeCalendar === 'end'" class="calendar-popout">
+            <div class="calendar-header">
+              <button type="button" class="calendar-nav" @click="changeCalendarMonth('end', -1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <strong>{{ getCalendarTitle('end') }}</strong>
+              <button type="button" class="calendar-nav" @click="changeCalendarMonth('end', 1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <span v-for="day in weekdayLabels" :key="day">{{ day }}</span>
+            </div>
+            <div class="calendar-grid">
+              <button
+                v-for="day in getCalendarDays('end')"
+                :key="day.iso"
+                type="button"
+                class="calendar-day"
+                :class="{ muted: !day.isCurrentMonth, selected: day.isSelected, today: day.isToday }"
+                @click="selectCalendarDate('end', day.iso)"
+              >
+                {{ day.dayNumber }}
+              </button>
+            </div>
+            <div class="calendar-footer">
+              <button type="button" class="calendar-link" @click="clearCalendarDate('end')">Clear</button>
+              <button type="button" class="calendar-link" @click="selectToday('end')">Today</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <button @click="clearFilters" class="btn filter-clear">Clear</button>
+
+      <div class="filter-group filter-action">
+        <button @click="clearFilters" class="btn-ghost" :class="{ 'visible': filters.project_id || filters.start_date || filters.end_date }">
+          Clear Filters
+        </button>
+      </div>
     </div>
 
     <!-- KPI STATS -->
     <section class="stats-container" v-if="isAdmin && summary">
       <div class="stat-box">
-        <label>All-Time Available Balance</label>
-        <div class="value">Rs. {{ summary.total_balance?.toLocaleString() || 0 }}</div>
+        <span class="stat-label">Available Balance</span>
+        <div class="stat-value">Rs. {{ summary.total_balance?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
-        <label>Filtered Revenue</label>
-        <div class="value positive">Rs. {{ summary.total_income?.toLocaleString() || 0 }}</div>
+        <span class="stat-label">Total Revenue</span>
+        <div class="stat-value positive">Rs. {{ summary.total_income?.toLocaleString() || 0 }}</div>
       </div>
       <div class="stat-box">
-        <label>Filtered Expenses</label>
-        <div class="value negative">Rs. {{ summary.total_expense?.toLocaleString() || 0 }}</div>
+        <span class="stat-label">Total Expenses</span>
+        <div class="stat-value negative">Rs. {{ summary.total_expense?.toLocaleString() || 0 }}</div>
       </div>
     </section>
 
     <!-- IN-DEPTH CHARTS -->
     <div class="detailed-charts" v-if="isAdmin && summary">
         
-        <!-- NEW STACKED CHART: Monthly breakdown showing exactly what project cost what -->
+        <!-- STACKED CHART: Monthly breakdown -->
         <div class="chart-card full-width-chart">
             <div class="chart-header">
               <h3>Monthly Expense Breakdown by Project</h3>
-              <span class="hint-text">Hover over segments to see specific project costs</span>
             </div>
-            <apexchart type="bar" height="350" :options="trendChartOptions" :series="trendSeries" />
+            <apexchart type="bar" height="380" :options="trendChartOptions" :series="trendSeries" />
         </div>
 
         <!-- Expense Distribution -->
         <div class="chart-card">
-            <div class="chart-header"><h3>Expenses by Category</h3></div>
-            <apexchart type="donut" height="300" :options="categoryChartOptions" :series="categorySeries" />
+            <div class="chart-header">
+              <h3>Expenses by Category</h3>
+              <span class="chart-subtitle">Based on your transaction entries</span>
+            </div>
+            <apexchart type="donut" height="320" :options="categoryChartOptions" :series="categorySeries" />
         </div>
 
         <!-- Material Cost Details -->
         <div class="chart-card">
-            <div class="chart-header"><h3>Deep Dive: Exact Material Costs</h3></div>
-            <apexchart type="bar" height="300" :options="materialChartOptions" :series="materialSeries" />
+            <div class="chart-header">
+              <h3>Specific Material Costs</h3>
+              <span class="chart-subtitle">Cost breakdown of procured items</span>
+            </div>
+            <apexchart type="bar" height="320" :options="materialChartOptions" :series="materialSeries" />
         </div>
     </div>
 
@@ -78,56 +177,63 @@
       <!-- EMPLOYEE PAYROLL -->
       <section class="content-card" v-if="isAdmin">
         <div class="card-head">
-          <h2>Employee Payroll</h2>
+          <div class="head-title">
+            <h2>Employee Payroll</h2>
+            <span class="month-label">{{ currentMonthLabel }}</span>
+          </div>
           <span class="badge">{{ employees.length }} Staff</span>
         </div>
-        <div class="payroll-month-label">{{ currentMonthLabel }}</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Salary</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="employees.length === 0">
-              <td colspan="4" style="text-align:center; color: var(--text-muted);">No employees found.</td>
-            </tr>
-            <tr v-for="emp in employees" :key="emp.id">
-              <td><strong>{{ emp.name }}</strong></td>
-              <td>{{ emp.role }}</td>
-              <td>Rs. {{ Number(emp.salary_amount).toLocaleString() }}</td>
-              <td>
-                <span v-if="emp.paid_this_month" class="paid-badge">✓ Paid</span>
-                <button v-else @click="processSalary(emp)" class="pay-btn">Pay Salary</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Salary</th>
+                <th class="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="employees.length === 0">
+                <td colspan="4" class="text-center text-muted">No employees found.</td>
+              </tr>
+              <tr v-for="emp in employees" :key="emp.id">
+                <td><strong>{{ emp.name }}</strong></td>
+                <td class="text-muted">{{ emp.role }}</td>
+                <td>Rs. {{ Number(emp.salary_amount).toLocaleString() }}</td>
+                <td class="text-right">
+                  <span v-if="emp.paid_this_month" class="status-badge success">Paid</span>
+                  <button v-else @click="processSalary(emp)" class="btn-xs primary-outline">Pay</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- VENDOR LIST -->
-      <section class="content-card vendor-section">
+      <section class="content-card">
         <div class="card-head">
-          <h2>Vendor Directory</h2>
-          <span class="hint-text">(Click to view details)</span>
+          <div class="head-title">
+            <h2>Vendor Directory</h2>
+          </div>
         </div>
+        
         <div class="vendor-list">
-          <div v-if="vendors.length === 0" style="text-align:center; color: var(--text-muted); padding: 20px;">
-            No vendors registered.
+          <div v-if="vendors.length === 0" class="text-center text-muted" style="padding: 30px;">
+            No vendors registered yet.
           </div>
           <div
             v-for="vendor in vendors"
             :key="vendor.id"
-            class="vendor-item clickable"
+            class="vendor-item"
             @click="viewVendor(vendor)"
           >
             <div class="v-info">
               <h3>{{ vendor.name }}</h3>
-              <span class="p-link">Project: {{ vendor.project?.name || 'Unlinked' }}</span>
-              <div class="v-meta" v-if="vendor.contact_person">Contact: {{ vendor.contact_person }}</div>
+              <span class="v-project">{{ vendor.project?.name || 'General / Unlinked' }}</span>
+              <span class="v-meta" v-if="vendor.contact_person">Contact: {{ vendor.contact_person }}</span>
             </div>
             <div class="v-amount">Rs. {{ calculateVendorTotal(vendor.materials).toLocaleString() }}</div>
           </div>
@@ -136,11 +242,13 @@
     </div>
 
     <!-- 1. VENDOR DETAILS MODAL -->
-    <div v-if="showDetailModal && selectedVendor" class="modal-backdrop">
+    <div v-if="showDetailModal && selectedVendor" class="modal-backdrop" @click.self="showDetailModal = false">
       <div class="modal-card wide">
         <div class="modal-header">
           <h3>Vendor Details</h3>
-          <button @click="showDetailModal = false" class="close-btn">×</button>
+          <button @click="showDetailModal = false" class="close-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
         <div class="detail-content">
           <div class="vendor-profile">
@@ -151,7 +259,7 @@
               </div>
               <div class="vp-item">
                 <label>Assigned Project</label>
-                <span class="highlight-text">{{ selectedVendor.project?.name || 'N/A' }}</span>
+                <span>{{ selectedVendor.project?.name || 'N/A' }}</span>
               </div>
             </div>
             <div class="vp-row">
@@ -165,85 +273,97 @@
               </div>
             </div>
           </div>
+          
           <h4 class="section-title">Supplied Materials</h4>
-          <div class="table-responsive">
+          <div class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Material</th>
                   <th>Unit Price</th>
-                  <th>Quantity</th>
-                  <th>Total</th>
+                  <th>Qty</th>
+                  <th class="text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!selectedVendor.materials || selectedVendor.materials.length === 0">
-                  <td colspan="4" class="text-center">No materials recorded.</td>
+                  <td colspan="4" class="text-center text-muted">No materials recorded.</td>
                 </tr>
                 <tr v-for="(mat, idx) in selectedVendor.materials" :key="idx">
                   <td>{{ mat.material_name }}</td>
-                  <td>Rs. {{ Number(mat.unit_price).toLocaleString() }}</td>
-                  <td>{{ mat.quantity }}</td>
-                  <td><strong>Rs. {{ Number(mat.total_price).toLocaleString() }}</strong></td>
+                  <td class="text-muted">Rs. {{ Number(mat.unit_price).toLocaleString() }}</td>
+                  <td class="text-muted">{{ mat.quantity }}</td>
+                  <td class="text-right font-medium">Rs. {{ Number(mat.total_price).toLocaleString() }}</td>
                 </tr>
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="3" class="text-right"><strong>Grand Total:</strong></td>
-                  <td><strong>Rs. {{ calculateVendorTotal(selectedVendor.materials).toLocaleString() }}</strong></td>
+                  <td colspan="3" class="text-right text-muted">Grand Total</td>
+                  <td class="text-right font-bold text-main">Rs. {{ calculateVendorTotal(selectedVendor.materials).toLocaleString() }}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
-        <div class="modal-footer">
-          <button @click="showDetailModal = false" class="btn secondary full-width">Close</button>
-        </div>
       </div>
     </div>
 
     <!-- 2. REGISTER VENDOR MODAL -->
-    <div v-if="showVendorModal" class="modal-backdrop">
+    <div v-if="showVendorModal" class="modal-backdrop" @click.self="showVendorModal = false">
       <div class="modal-card wide">
         <div class="modal-header">
           <h3>Register Vendor</h3>
-          <button @click="showVendorModal = false" class="close-btn">×</button>
+          <button @click="showVendorModal = false" class="close-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
         <form @submit.prevent="saveVendor">
           <div class="form-row">
             <div class="form-group">
               <label>Vendor Name</label>
-              <input type="text" v-model="formV.name" required placeholder="Birat Steel etc." />
+              <input type="text" v-model="formV.name" class="styled-input" required placeholder="e.g. Acme Cement Co." />
             </div>
             <div class="form-group">
               <label>Assigned Project</label>
-              <select v-model="formV.project_id" required>
-                <option value="" disabled>Select a Project</option>
-                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-              </select>
+              <div class="select-wrapper">
+                <select v-model="formV.project_id" class="styled-input" required>
+                  <option value="" disabled>Select a Project</option>
+                  <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>Contact Person</label>
-              <input type="text" v-model="formV.contact_person" placeholder="Manager Name" />
+              <input type="text" v-model="formV.contact_person" class="styled-input" placeholder="Manager Name" />
             </div>
             <div class="form-group">
               <label>Phone Number</label>
-              <input type="text" v-model="formV.phone" placeholder="98XXXXXXXX" />
+              <input type="text" v-model="formV.phone" class="styled-input" placeholder="Contact number" />
             </div>
           </div>
           <div class="material-builder">
-            <label>Materials</label>
-            <div v-for="(mat, idx) in formV.materials" :key="idx" class="builder-row">
-              <input type="text" v-model="mat.material_name" placeholder="Item Name" required />
-              <input type="number" v-model="mat.unit_price" placeholder="Price/Unit" required min="0" />
-              <input type="number" v-model="mat.quantity" placeholder="Qty" required min="1" />
-              <button type="button" @click="removeMaterial(idx)" class="del-row">×</button>
+            <div class="builder-header">
+              <label>Materials Supplied</label>
+              <button type="button" @click="addMaterial" class="btn-text">+ Add Item</button>
             </div>
-            <button type="button" @click="addMaterial" class="add-row">+ Add Item</button>
+            <div class="builder-labels" v-if="formV.materials.length > 0">
+              <span>Item Name</span>
+              <span>Price/Unit</span>
+              <span>Qty</span>
+              <span></span>
+            </div>
+            <div v-for="(mat, idx) in formV.materials" :key="idx" class="builder-row">
+              <input type="text" v-model="mat.material_name" class="styled-input solid" placeholder="Cement, Steel..." required />
+              <input type="number" v-model="mat.unit_price" class="styled-input solid" placeholder="0.00" required min="0" />
+              <input type="number" v-model="mat.quantity" class="styled-input solid" placeholder="1" required min="1" />
+              <button type="button" @click="removeMaterial(idx)" class="btn-icon danger" title="Remove">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
           </div>
-          <button type="submit" class="btn-save" :disabled="isSaving">
+          <button type="submit" class="btn primary full-width" :disabled="isSaving">
             {{ isSaving ? 'Saving...' : 'Register Vendor' }}
           </button>
         </form>
@@ -251,48 +371,92 @@
     </div>
 
     <!-- 3. TRANSACTION MODAL -->
-    <div v-if="showTransactionModal" class="modal-backdrop">
+    <div v-if="showTransactionModal" class="modal-backdrop" @click.self="showTransactionModal = false">
       <div class="modal-card">
         <div class="modal-header">
           <h3>Record Transaction</h3>
-          <button @click="showTransactionModal = false" class="close-btn">×</button>
+          <button @click="showTransactionModal = false" class="close-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
         <form @submit.prevent="saveTransaction">
           <div class="form-group">
-            <label>Type</label>
-            <select v-model="formT.type" required>
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
-              <option value="pre-payment">Pre-payment</option>
-            </select>
+            <label>Transaction Type</label>
+            <div class="select-wrapper">
+              <select v-model="formT.type" class="styled-input" required>
+                <option value="income">Income (Client Payment)</option>
+                <option value="expense">Expense (Outflow)</option>
+                <option value="pre-payment">Pre-payment / Advance</option>
+              </select>
+            </div>
           </div>
           
-          <!-- New Project Link feature inside transaction creation -->
           <div class="form-group" v-if="formT.type !== 'income'">
             <label>Link to Project (Optional)</label>
-            <select v-model="formT.project_id">
-              <option value="">General / No Specific Project</option>
-              <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-            </select>
+            <div class="select-wrapper">
+              <select v-model="formT.project_id" class="styled-input">
+                <option value="">General / No Specific Project</option>
+                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
           </div>
 
+          <div class="form-row">
+            <div class="form-group">
+              <label>Amount (Rs.)</label>
+              <input type="number" v-model="formT.amount" class="styled-input" required min="0" placeholder="0.00" />
+            </div>
+            <div class="form-group">
+              <label>Date</label>
+              <div class="calendar-field" @click.stop>
+                <div class="custom-date-box" :class="{ open: activeCalendar === 'transaction' }" @click="toggleCalendar('transaction')">
+                  <span :class="{'text-placeholder': !formT.date}">
+                    {{ formT.date ? formatDateDisplay(formT.date) : 'Select Date' }}
+                  </span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                </div>
+                <div v-if="activeCalendar === 'transaction'" class="calendar-popout calendar-popout-modal">
+                  <div class="calendar-header">
+                    <button type="button" class="calendar-nav" @click="changeCalendarMonth('transaction', -1)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <strong>{{ getCalendarTitle('transaction') }}</strong>
+                    <button type="button" class="calendar-nav" @click="changeCalendarMonth('transaction', 1)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                  </div>
+                  <div class="calendar-weekdays">
+                    <span v-for="day in weekdayLabels" :key="day">{{ day }}</span>
+                  </div>
+                  <div class="calendar-grid">
+                    <button
+                      v-for="day in getCalendarDays('transaction')"
+                      :key="day.iso"
+                      type="button"
+                      class="calendar-day"
+                      :class="{ muted: !day.isCurrentMonth, selected: day.isSelected, today: day.isToday }"
+                      @click="selectCalendarDate('transaction', day.iso)"
+                    >
+                      {{ day.dayNumber }}
+                    </button>
+                  </div>
+                  <div class="calendar-footer">
+                    <button type="button" class="calendar-link" @click="clearCalendarDate('transaction')">Clear</button>
+                    <button type="button" class="calendar-link" @click="selectToday('transaction')">Today</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="form-group">
             <label>Category</label>
-            <input type="text" v-model="formT.category" required placeholder="e.g. Logistics, Consulting" />
-          </div>
-          <div class="form-group">
-            <label>Amount (Rs.)</label>
-            <input type="number" v-model="formT.amount" required min="0" />
-          </div>
-          <div class="form-group">
-            <label>Date</label>
-            <input type="date" v-model="formT.date" required />
+            <input type="text" v-model="formT.category" class="styled-input" required placeholder="e.g. Labor, Concrete, Machinery" />
           </div>
           <div class="form-group">
             <label>Description (Optional)</label>
-            <textarea v-model="formT.description" rows="2" placeholder="Details..."></textarea>
+            <textarea v-model="formT.description" class="styled-input" rows="3" placeholder="Brief details regarding the transaction..."></textarea>
           </div>
-          <button type="submit" class="btn-save full-width">Save Transaction</button>
+          <button type="submit" class="btn primary full-width">Save Transaction</button>
         </form>
       </div>
     </div>
@@ -301,7 +465,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import apexchart from "vue3-apexcharts";
 import { useAuth } from '../useAuth';
@@ -313,39 +477,190 @@ const employees = ref([]);
 const projects = ref([]);
 
 const filters = ref({ start_date: '', end_date: '', project_id: '' });
+const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const activeCalendar = ref(null);
 
-// 1. STACKED BAR CHART: Expenses by Project
+// ----------------------------------------------------
+// HELPER FUNCTIONS
+// ----------------------------------------------------
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${parseInt(day)} ${months[parseInt(month)-1]} ${year}`;
+};
+
+const createViewDate = (dateStr) => {
+  const baseDate = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
+  return new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+};
+
+const calendarView = ref({
+  start: createViewDate(filters.value.start_date),
+  end: createViewDate(filters.value.end_date),
+  transaction: createViewDate(new Date().toISOString().split('T')[0])
+});
+
+const formatDateIso = (date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getFieldValue = (key) => {
+  if (key === 'start') return filters.value.start_date;
+  if (key === 'end') return filters.value.end_date;
+  return formT.value.date;
+};
+
+const setFieldValue = (key, value) => {
+  if (key === 'start') filters.value.start_date = value;
+  else if (key === 'end') filters.value.end_date = value;
+  else formT.value.date = value;
+};
+
+const syncCalendarView = (key) => {
+  calendarView.value[key] = createViewDate(getFieldValue(key));
+};
+
+const toggleCalendar = (key) => {
+  if (activeCalendar.value === key) {
+    activeCalendar.value = null;
+    return;
+  }
+  syncCalendarView(key);
+  activeCalendar.value = key;
+};
+
+const getCalendarTitle = (key) => {
+  const viewDate = calendarView.value[key];
+  return viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+
+const changeCalendarMonth = (key, direction) => {
+  const nextView = new Date(calendarView.value[key]);
+  nextView.setMonth(nextView.getMonth() + direction);
+  calendarView.value[key] = new Date(nextView.getFullYear(), nextView.getMonth(), 1);
+};
+
+const getCalendarDays = (key) => {
+  const viewDate = calendarView.value[key];
+  const selectedDate = getFieldValue(key);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const startDate = new Date(year, month, 1 - startOffset);
+  const todayIso = formatDateIso(new Date());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const current = new Date(startDate);
+    current.setDate(startDate.getDate() + index);
+    const iso = formatDateIso(current);
+
+    return {
+      iso,
+      dayNumber: current.getDate(),
+      isCurrentMonth: current.getMonth() === month,
+      isToday: iso === todayIso,
+      isSelected: iso === selectedDate
+    };
+  });
+};
+
+const selectCalendarDate = (key, value) => {
+  setFieldValue(key, value);
+  activeCalendar.value = null;
+  if (key !== 'transaction') loadData();
+};
+
+const clearCalendarDate = (key) => {
+  setFieldValue(key, '');
+  activeCalendar.value = null;
+  if (key !== 'transaction') loadData();
+};
+
+const selectToday = (key) => {
+  selectCalendarDate(key, formatDateIso(new Date()));
+};
+
+const closeCalendar = () => {
+  activeCalendar.value = null;
+};
+
+// ----------------------------------------------------
+// CHARTS SETUP - ARCHITECTURAL MINIMALIST STYLING
+// ----------------------------------------------------
+const chartFont = 'Plus Jakarta Sans, sans-serif';
+const archColors = ['#A65D43', '#475569', '#94A3B8', '#D97706', '#1E293B', '#64748B'];
+
 const trendSeries = ref([]);
 const trendChartOptions = ref({
-    chart: { type: 'bar', stacked: true, fontFamily: 'Plus Jakarta Sans, sans-serif', toolbar: { show: false } },
+    chart: { type: 'bar', stacked: true, fontFamily: chartFont, toolbar: { show: false } },
     plotOptions: { bar: { borderRadius: 4, horizontal: false, columnWidth: '40%' } },
     dataLabels: { enabled: false },
-    xaxis: { categories:[], labels: { style: { colors: 'var(--text-muted)' } } },
-    yaxis: { labels: { style: { colors: 'var(--text-muted)' }, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k` } },
-    colors:['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#A65D43', '#0EA5E9', '#F43F5E'],
-    legend: { position: 'top', horizontalAlign: 'right', labels: { colors: 'var(--text-main)' } },
+    xaxis: { 
+      categories:[], 
+      axisBorder: { show: false }, 
+      axisTicks: { show: false }, 
+      labels: { style: { colors: '#64748B', fontSize: '13px', fontWeight: 500 } } 
+    },
+    yaxis: { 
+      labels: { 
+        style: { colors: '#64748B', fontSize: '13px', fontWeight: 500 }, 
+        formatter: (val) => {
+          if (isNaN(val) || val === null) return val;
+          return `Rs. ${(val/1000).toFixed(1)}k`;
+        }
+      } 
+    },
+    colors: archColors,
+    legend: { position: 'top', horizontalAlign: 'right', labels: { colors: '#475569' }, markers: { radius: 12 } },
     fill: { opacity: 1 },
-    grid: { borderColor: 'var(--border)' }
+    grid: { show: false } 
 });
 
 const categorySeries = ref([]);
 const categoryChartOptions = ref({
     labels:[],
-    chart: { type: 'donut', fontFamily: 'Plus Jakarta Sans, sans-serif' },
-    colors:['#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6', '#10B981', '#64748B'],
+    chart: { type: 'donut', fontFamily: chartFont },
+    colors: archColors,
     dataLabels: { enabled: false },
-    legend: { position: 'bottom', labels: { colors: 'var(--text-main)' } }
+    stroke: { show: false },
+    legend: { position: 'bottom', labels: { colors: '#475569' }, markers: { radius: 12 } },
+    tooltip: {
+      y: { formatter: function(val) { return "Rs. " + val.toLocaleString() } }
+    }
 });
 
 const materialSeries = ref([]);
 const materialChartOptions = ref({
-    chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans, sans-serif' },
-    xaxis: { categories:[], labels: { style: { colors: 'var(--text-muted)' } } },
-    yaxis: { labels: { style: { colors: 'var(--text-muted)' }, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k` } },
-    colors:['#A65D43'],
-    plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-    dataLabels: { enabled: true, formatter: (val) => `Rs. ${(val/1000).toFixed(1)}k`, style: { colors: ['#fff'] } },
-    grid: { borderColor: 'var(--border)' }
+    chart: { type: 'bar', toolbar: { show: false }, fontFamily: chartFont },
+    // Horizontal bars: Data is on X, Categories are on Y
+    plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '50%' } },
+    dataLabels: { enabled: false },
+    xaxis: { 
+      axisBorder: { show: false }, 
+      axisTicks: { show: false }, 
+      labels: { 
+        style: { colors: '#64748B', fontSize: '13px', fontWeight: 500 },
+        formatter: (val) => {
+          if (isNaN(val) || val === null) return val;
+          return `Rs. ${(val/1000).toFixed(1)}k`;
+        }
+      } 
+    },
+    yaxis: { 
+      labels: { 
+        style: { colors: '#64748B', fontSize: '13px', fontWeight: 600 }
+      } 
+    },
+    colors: ['#A65D43'], 
+    grid: { show: false },
+    tooltip: {
+      y: { formatter: function(val) { return "Rs. " + val.toLocaleString() } }
+    }
 });
 
 const showVendorModal = ref(false);
@@ -394,7 +709,6 @@ const loadData = async () => {
       summary.value = responses[2].data || {};
       employees.value = responses[3].data ||[];
 
-      // SAFETY CHECK: Fallback to empty array if undefined
       const stats = summary.value.project_monthly_stats ||[];
       const catStats = summary.value.category_breakdown || [];
       const matStats = summary.value.material_breakdown || [];
@@ -411,25 +725,26 @@ const loadData = async () => {
           })
         };
       });
-      trendChartOptions.value = { ...trendChartOptions.value, xaxis: { categories: months } };
+      trendChartOptions.value = { ...trendChartOptions.value, xaxis: { ...trendChartOptions.value.xaxis, categories: months } };
 
       categorySeries.value = catStats.map(c => Number(c.total));
       categoryChartOptions.value = {
           ...categoryChartOptions.value,
-          labels: catStats.map(c => c.category)
+          labels: catStats.map(c => c.category) 
       };
 
       materialSeries.value =[{
-          name: 'Material Cost',
+          name: 'Total Cost',
           data: matStats.map(m => Number(m.total_cost))
       }];
       materialChartOptions.value = {
           ...materialChartOptions.value,
-          xaxis: { categories: matStats.map(m => m.material_name) }
+          xaxis: { ...materialChartOptions.value.xaxis },
+          // Insert category names into xaxis configuration for horizontal bar charts
+          xaxis: { ...materialChartOptions.value.xaxis, categories: matStats.map(m => m.material_name) }
       };
     }
   } catch (e) {
-    // If it fails again, check your browser console! It will tell us exactly why.
     console.error("Data load failed! API Error:", e.response?.data || e);
   }
 };
@@ -438,7 +753,6 @@ const viewVendor = (vendor) => { selectedVendor.value = vendor; showDetailModal.
 const addMaterial = () => { formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' }); };
 const removeMaterial = (idx) => {
   if (formV.value.materials.length > 1) { formV.value.materials.splice(idx, 1); }
-  else { alert("At least one material is required."); }
 };
 
 const saveVendor = async () => {
@@ -453,10 +767,9 @@ const saveVendor = async () => {
 };
 
 const processSalary = async (emp) => {
-  if (confirm(`Record salary payment of Rs. ${emp.salary_amount} for ${emp.name}?`)) {
+  if (confirm(`Process salary payment of Rs. ${emp.salary_amount} for ${emp.name}?`)) {
     try {
       await axios.post(`/finance/employees/${emp.id}/pay`);
-      alert("Salary payment added to expenses!");
       loadData();
     } catch (e) {
       if (e.response && e.response.status === 422) { alert(e.response.data.message); }
@@ -481,120 +794,387 @@ const saveTransaction = async () => {
 
 const calculateVendorTotal = (mats) => mats?.reduce((acc, m) => acc + parseFloat(m.total_price || 0), 0) || 0;
 
-onMounted(loadData);
+onMounted(() => {
+  loadData();
+  document.addEventListener('click', closeCalendar);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeCalendar);
+});
 </script>
 
 <style scoped>
-.finance-page { padding: 40px; animation: fadeIn 0.4s ease-out; }
-.finance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.header-right { display: flex; gap: 10px; }
-.action-buttons { display: flex; gap: 10px; }
-h1 { color: var(--text-main); font-size: 2rem; font-weight: 800; margin: 0; }
-p { color: var(--text-secondary); margin-top: 5px; }
+/* PAGE LAYOUT - MINIMALIST & ARCHITECTURAL */
+.finance-page { padding: 40px; animation: fadeIn 0.3s ease-out; max-width: 1280px; margin: 0 auto; }
+.finance-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 32px; }
+.eyebrow { display: inline-block; margin-bottom: 10px; color: var(--primary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.header-left h1 { color: var(--text-main); font-size: 2.15rem; font-weight: 800; margin: 0 0 8px 0; letter-spacing: -0.04em; }
+.header-left p { color: var(--text-secondary); margin: 0; font-size: 0.98rem; max-width: 560px; }
+.header-right { display: flex; align-items: center; gap: 14px; }
+.header-stats { display: flex; gap: 12px; }
+.stat-chip { min-width: 108px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; gap: 4px; }
+.stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.stat-chip strong { font-size: 1.05rem; color: var(--text-main); line-height: 1; }
+.action-buttons { display: flex; gap: 12px; }
 
-/* FILTERS */
-.filter-bar { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; background: var(--bg-surface); padding: 15px 25px; border-radius: 16px; border: 1px solid var(--border); align-items: flex-end; }
-.filter-item { display: flex; flex-direction: column; gap: 5px; }
-.filter-item label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
-.filter-item input, .filter-item select { margin: 0; padding: 8px 12px; height: 38px; }
-.project-filter { min-width: 220px; }
-.filter-clear { padding: 8px 15px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-body); height: 38px;}
+/* =========================================
+   GLOBAL INPUT RESET & CUSTOM STYLING 
+   ========================================= */
+.styled-input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 48px; /* Bigger inputs */
+  padding: 12px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 1rem; /* Larger font */
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+textarea.styled-input { height: auto; }
+.styled-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1);
+  background: var(--bg-surface);
+}
+.styled-input.solid { background: var(--bg-surface); } /* Used inside grey areas */
 
-/* KPI CARDS */
-.stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
-.stat-box { background: var(--bg-surface); padding: 25px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-.stat-box label { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
-.stat-box .value { font-size: 1.5rem; font-weight: 800; margin-top: 10px; color: var(--text-main); }
-.positive { color: var(--success-text) !important; }
-.negative { color: var(--danger-text) !important; }
+/* CUSTOM SVG WRAPPER FOR SELECT */
+.select-wrapper { position: relative; width: 100%; }
+.select-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none; /* Crucial: lets click pass through to the native select */
+}
+.select-wrapper select { padding-right: 48px; cursor: pointer; }
 
-/* CHARTS SECTION */
-.detailed-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; }
-.chart-card { background: var(--bg-surface); padding: 20px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+/* COMPLETELY CUSTOM DATE PICKER */
+.custom-date-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.custom-date-box.open,
+.custom-date-box:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1);
+  background: var(--bg-surface);
+}
+.custom-date-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1);
+  background: var(--bg-surface);
+}
+.custom-date-box span { font-size: 1rem; color: var(--text-main); pointer-events: none; }
+.custom-date-box span.text-placeholder { color: var(--text-muted); }
+.custom-date-box svg { color: var(--text-secondary); pointer-events: none; }
+
+.calendar-field {
+  position: relative;
+}
+
+.calendar-popout {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  width: 320px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(166, 93, 67, 0.12), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(166, 93, 67, 0.08), transparent 32%),
+    var(--bg-surface);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.14);
+  z-index: 40;
+  animation: calendarIn 0.18s ease;
+}
+
+.calendar-popout-modal {
+  width: 100%;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.calendar-header strong {
+  font-size: 1.1rem;
+  color: var(--text-main);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.calendar-nav {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calendar-nav:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.calendar-weekdays span {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.calendar-day {
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.calendar-day:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border) 60%);
+  background: rgba(166, 93, 67, 0.08);
+}
+
+.calendar-day.muted {
+  color: var(--text-muted);
+}
+
+.calendar-day.today {
+  border-color: var(--border);
+}
+
+.calendar-day.selected {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 10px 18px -14px rgba(166, 93, 67, 0.9);
+}
+
+.calendar-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.calendar-link {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.calendar-link:hover {
+  color: var(--text-main);
+}
+
+/* =========================================
+   FILTERS PANEL 
+   ========================================= */
+.filter-panel { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 20px; 
+  margin-bottom: 32px; 
+  align-items: flex-end; 
+  background: var(--bg-surface);
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+}
+.filter-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
+.project-filter { flex: 2; } /* Make project select wider */
+.filter-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.filter-action { flex: 0; }
+
+/* =========================================
+   BUTTONS
+   ========================================= */
+.btn { padding: 0 24px; height: 46px; border-radius: 10px; font-weight: 700; font-size: 0.94rem; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; letter-spacing: 0.2px; }
+.btn.primary { background: var(--primary); color: white; }
+.btn.primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(166, 93, 67, 0.2); }
+.btn.secondary { background: transparent; border: 2px solid var(--border); color: var(--text-main); }
+.btn.secondary:hover { border-color: var(--primary); color: var(--primary); }
+
+.btn-ghost { background: transparent; color: var(--text-secondary); border: none; font-size: 0.95rem; font-weight: 700; cursor: pointer; padding: 0 20px; height: 48px; transition: 0.2s; border-radius: 8px; opacity: 0; visibility: hidden; }
+.btn-ghost.visible { opacity: 1; visibility: visible; }
+.btn-ghost:hover { color: var(--danger-text); background: var(--danger-bg); }
+
+.btn.full-width { width: 100%; margin-top: 24px; }
+.btn-xs { padding: 8px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer; font-weight: 700; transition: 0.2s; border: none; }
+.primary-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+.primary-outline:hover { background: var(--primary); color: white; }
+
+.btn-text { background: transparent; border: none; color: var(--primary); font-size: 0.95rem; font-weight: 700; cursor: pointer; padding: 4px 8px; transition: 0.2s;}
+.btn-text:hover { color: var(--text-main); }
+.btn-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 6px; transition: 0.2s; }
+.btn-icon.danger { color: var(--text-muted); }
+.btn-icon.danger:hover { background: var(--danger-bg); color: var(--danger-text); }
+
+/* =========================================
+   KPI CARDS
+   ========================================= */
+.stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px; }
+.stat-box { background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-input) 18%); padding: 28px; border-radius: 18px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
+.stat-box:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border) 55%); transform: translateY(-2px); box-shadow: 0 16px 24px -20px rgba(0,0,0,0.35); }
+.stats-container .stat-label { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+.stat-value { font-size: 2rem; font-weight: 800; color: var(--text-main); line-height: 1; }
+.positive { color: #10B981; }
+.negative { color: #EF4444; }
+
+/* =========================================
+   CHARTS SECTION
+   ========================================= */
+.detailed-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; }
+.chart-card { background: var(--bg-surface); padding: 28px; border-radius: 18px; border: 1px solid var(--border); display: flex; flex-direction: column;}
 .full-width-chart { grid-column: 1 / -1; }
-.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.chart-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-main); }
+.chart-header { margin-bottom: 30px; display: flex; flex-direction: column; gap: 4px; }
+.chart-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+.chart-subtitle { font-size: 0.85rem; color: var(--text-muted); }
 
-/* GRID */
-.finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+/* =========================================
+   CONTENT GRID (Tables & Lists)
+   ========================================= */
+.finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .finance-grid.full-width { grid-template-columns: 1fr; }
 
-.content-card { background: var(--bg-surface); padding: 30px; border-radius: 24px; border: 1px solid var(--border); }
-.card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.card-head h2 { color: var(--text-main); margin: 0; font-size: 1.25rem; font-weight: 800; }
-.hint-text { font-size: 0.8rem; color: var(--text-muted); font-weight: normal; }
-.badge { background: var(--bg-input); color: var(--text-body); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid var(--border); }
+.content-card { background: var(--bg-surface); border-radius: 18px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 24px 30px; border-bottom: 1px solid var(--border); background: var(--bg-input); }
+.head-title h2 { color: var(--text-main); margin: 0 0 6px 0; font-size: 1.2rem; font-weight: 700; }
+.month-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;}
+.badge { background: var(--bg-surface); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; border: 1px solid var(--border); }
 
-/* PAYROLL MONTH LABEL */
-.payroll-month-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px; }
-
-/* TABLE */
-.data-table { width: 100%; border-collapse: collapse; color: var(--text-main); }
-.data-table th { text-align: left; font-size: 12px; color: var(--text-secondary); padding-bottom: 15px; }
-.data-table td { padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-body); }
-.data-table strong { color: var(--text-main); }
-.data-table tfoot td { border-top: 2px solid var(--border); padding-top: 15px; font-size: 1.1rem; }
+/* TABLES */
+.table-wrapper { width: 100%; overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; text-align: left; }
+.data-table th { padding: 16px 30px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.data-table td { padding: 20px 30px; font-size: 0.95rem; color: var(--text-main); border-bottom: 1px solid var(--border); }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tfoot td { padding: 20px 30px; border-top: 2px solid var(--border); background: var(--bg-input); }
 .text-right { text-align: right; }
 .text-center { text-align: center; }
+.text-muted { color: var(--text-secondary); }
+.font-medium { font-weight: 600; }
+.font-bold { font-weight: 800; font-size: 1.1rem; }
+.text-main { color: var(--text-main); }
 
-/* PAY BUTTON */
-.pay-btn { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12px; transition: 0.2s; }
-.pay-btn:hover { opacity: 0.9; }
+/* STATUS BADGES */
+.status-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; }
+.status-badge.success { background: rgba(16, 185, 129, 0.1); color: #059669; }
 
-/* PAID BADGE */
-.paid-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; }
+/* VENDOR LIST */
+.vendor-list { display: flex; flex-direction: column; overflow-y: auto; max-height: 450px; }
+.vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 30px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s; }
+.vendor-item:last-child { border-bottom: none; }
+.vendor-item:hover { background: color-mix(in srgb, var(--bg-surface) 78%, var(--bg-input) 22%); }
+.v-info { display: flex; flex-direction: column; gap: 6px; }
+.v-info h3 { margin: 0; font-size: 1.05rem; color: var(--text-main); font-weight: 700; }
+.v-project { font-size: 0.85rem; color: var(--primary); font-weight: 600; }
+.v-meta { font-size: 0.8rem; color: var(--text-secondary); }
+.v-amount { font-weight: 800; font-size: 1.1rem; color: var(--text-main); }
 
-/* VENDORS LIST */
-.vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 15px 0; border-top: 1px solid var(--border); transition: 0.2s; }
-.clickable { cursor: pointer; padding: 15px; border-radius: 12px; border: 1px solid transparent; border-top: 1px solid var(--border); }
-.clickable:hover { background: var(--bg-input); border-color: var(--border); transform: translateX(5px); }
-.v-info h3 { margin: 0; font-size: 15px; color: var(--text-main); }
-.p-link { font-size: 12px; color: var(--primary); font-weight: 700; display: block; margin-top: 2px; }
-.v-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.v-amount { font-weight: 800; color: var(--text-main); }
+/* =========================================
+   MODALS
+   ========================================= */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: fadeIn 0.2s ease; padding: 20px; }
+.modal-card { background: var(--bg-surface); padding: 32px; border-radius: 18px; width: 500px; border: 1px solid var(--border); box-shadow: 0 24px 50px rgba(0,0,0,0.12); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+.modal-card.wide { width: 750px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+.modal-header h3 { color: var(--text-main); margin: 0; font-size: 1.4rem; font-weight: 800; }
+.close-btn { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: 0.2s; }
+.close-btn:hover { background: var(--bg-input); color: var(--text-main); }
 
-/* VENDOR DETAIL */
-.vendor-profile { background: var(--bg-input); padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--border); }
-.vp-row { display: flex; justify-content: space-between; margin-bottom: 15px; }
-.vp-row:last-child { margin-bottom: 0; }
-.vp-item { width: 48%; }
-.vp-item label { display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
-.vp-item span { font-size: 1rem; color: var(--text-main); font-weight: 600; }
-.highlight-text { color: var(--primary) !important; }
-.section-title { margin: 0 0 15px; color: var(--text-main); font-size: 1.1rem; border-left: 4px solid var(--primary); padding-left: 10px; }
+/* FORMS IN MODALS */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.form-group { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
+.form-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
 
-/* MODALS */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-.modal-card { background: var(--bg-surface); padding: 35px; border-radius: 24px; width: 450px; border: 1px solid var(--border); box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto; }
-.wide { width: 700px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.modal-header h3 { color: var(--text-main); margin: 0; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text-secondary); }
-input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); box-sizing: border-box; background: var(--bg-input); color: var(--text-main); font-family: inherit; }
-input:focus, select:focus { border-color: var(--primary); outline: none; }
+/* BUILDER (Vendor Materials) */
+.material-builder { border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 10px 0 30px 0; background: var(--bg-input); }
+.builder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.builder-header label { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+.builder-labels { display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 16px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; margin-bottom: 12px; padding: 0 4px; text-transform: uppercase; letter-spacing: 0.5px;}
+.builder-row { display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 16px; margin-bottom: 12px; align-items: center; }
+.builder-row:last-child { margin-bottom: 0; }
 
-.material-builder { background: var(--bg-input); padding: 20px; border-radius: 15px; margin: 20px 0; border: 1px solid var(--border); }
-.material-builder label { color: var(--text-main); font-weight: 700; margin-bottom: 10px; display: block; }
-.builder-row { display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 10px; margin-bottom: 10px; }
-.del-row { background: var(--danger-bg); color: var(--danger-text); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-.add-row { background: none; border: 1px dashed var(--primary); color: var(--primary); padding: 8px; width: 100%; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.2s; }
-.add-row:hover { background: var(--bg-surface); }
-
-.btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
-.primary { background: var(--primary); color: white; }
-.secondary { background: var(--bg-input); color: var(--text-body); border: 1px solid var(--border); }
-.secondary:hover { background: var(--bg-body); }
-.btn-save { background: var(--text-main); color: var(--bg-surface); padding: 15px; width: 100%; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; margin-top: 10px; }
-.full-width { width: 100%; }
-.close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); }
-.modal-footer { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px; }
+/* VENDOR PROFILE (Modal Details) */
+.detail-content { display: flex; flex-direction: column; gap: 30px; }
+.vendor-profile { background: var(--bg-input); border: 1px solid var(--border); padding: 24px; border-radius: 8px; display: flex; flex-direction: column; gap: 20px; }
+.vp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.vp-item { display: flex; flex-direction: column; gap: 6px; }
+.vp-item label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;}
+.vp-item span { font-size: 1.05rem; color: var(--text-main); font-weight: 600;}
+.section-title { margin: 0; color: var(--text-main); font-size: 1.2rem; font-weight: 700; border-left: 4px solid var(--primary); padding-left: 12px;}
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes calendarIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
 @media (max-width: 1024px) { 
-  .finance-grid { grid-template-columns: 1fr; } 
-  .stats-container { grid-template-columns: 1fr; } 
-  .detailed-charts { grid-template-columns: 1fr; }
+  .finance-grid, .stats-container, .detailed-charts { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .filter-panel { flex-direction: column; align-items: stretch; }
+  .finance-header { flex-direction: column; align-items: stretch; }
+  .header-right { flex-direction: column; align-items: stretch; }
+  .header-stats { width: 100%; }
+  .stat-chip { flex: 1; }
+  .builder-labels { display: none; } 
+  .builder-row { grid-template-columns: 1fr; gap: 12px; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px dashed var(--border); }
+  .builder-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .calendar-popout { width: min(320px, 100%); }
 }
 </style>
