@@ -39,7 +39,9 @@ class Project extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(User::class)
+            ->withPivot(['assigned_at', 'assigned_by'])
+            ->withTimestamps();
     }
 
     public function actualMaterials()

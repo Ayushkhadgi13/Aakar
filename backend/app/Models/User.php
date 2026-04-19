@@ -31,8 +31,10 @@ class User extends Authenticatable
         ];
     }
 
-    // NEW: Define relationship with projects
-    public function projects() {
-        return $this->belongsToMany(Project::class);
+    public function projects()
+    {
+        return $this->belongsToMany(Project::class)
+            ->withPivot(['assigned_at', 'assigned_by'])
+            ->withTimestamps();
     }
 }

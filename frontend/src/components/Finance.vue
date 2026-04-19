@@ -391,7 +391,7 @@
             </div>
           </div>
           
-          <div class="form-group" v-if="formT.type !== 'income'">
+          <div class="form-group">
             <label>Link to Project (Optional)</label>
             <div class="select-wrapper">
               <select v-model="formT.project_id" class="styled-input">
@@ -781,9 +781,7 @@ const processSalary = async (emp) => {
 const saveTransaction = async () => {
   try {
     const payload = { ...formT.value };
-    if (!payload.project_id || payload.type === 'income') {
-        delete payload.project_id;
-    }
+    payload.project_id = payload.project_id || null;
 
     await axios.post('/finance/transactions', payload);
     showTransactionModal.value = false;

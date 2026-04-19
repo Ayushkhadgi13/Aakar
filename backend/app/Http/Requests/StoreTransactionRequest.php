@@ -27,6 +27,7 @@ class StoreTransactionRequest extends FormRequest
             'category'    => ['required', 'string'],
             'date'        => ['required', 'date'],
             'description' => ['nullable', 'string'],
+            'project_id'  => ['nullable', 'exists:projects,id'],
         ];
     }
 }

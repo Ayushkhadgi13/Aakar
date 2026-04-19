@@ -15,6 +15,7 @@ use App\Models\VendorMaterial;
 use App\Notifications\BOQReviewed;
 use App\Notifications\BOQUploaded;
 use App\Notifications\ProjectAssigned;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -110,7 +111,9 @@ class ProjectController extends Controller
         $incomingIds = collect($validated['user_ids'])->map(fn ($value) => (int) $value);
         $newIds = $incomingIds->diff($existingIds);
 
-        $project->users()->sync($incomingIds->all());
+        $project->users()->sync(
+            $this->buildProjectUserSyncPayload($project, $incomingIds->all(), $request->user()->id)
+        );
         $project->load('users');
 
         if ($newIds->isNotEmpty()) {
@@ -151,7 +154,9 @@ class ProjectController extends Controller
         $incomingIds = collect($validated['user_ids'])->map(fn ($value) => (int) $value);
         $newIds = $incomingIds->diff($existingIds);
 
-        $project->users()->syncWithoutDetaching($incomingIds->all());
+        $project->users()->syncWithoutDetaching(
+            $this->buildProjectUserSyncPayload($project, $incomingIds->all(), $request->user()->id)
+        );
         $project->load('users');
 
         if ($newIds->isNotEmpty()) {
@@ -486,6 +491,24 @@ class ProjectController extends Controller
     protected function canAccessProject(User $user, Project $project): bool
     {
         return $user->role === 'admin' || $project->users->contains($user->id);
+    }
+
+    protected function buildProjectUserSyncPayload(Project $project, array $userIds, int $assignerId): array
+    {
+        $now = Carbon::now();
+
+        return collect($userIds)
+            ->mapWithKeys(function (int $userId) use ($project, $assignerId, $now) {
+                $existingUser = $project->users->firstWhere('id', $userId);
+
+                return [
+                    $userId => [
+                        'assigned_at' => $existingUser?->pivot?->assigned_at ?? $now,
+                        'assigned_by' => $existingUser?->pivot?->assigned_by ?? $assignerId,
+                    ],
+                ];
+            })
+            ->all();
     }
 
     protected function normalizeMaterialName(string $name): string
