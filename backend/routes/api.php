@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/finance/summary', [FinanceController::class, 'getSummary']);
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
     Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
+    Route::post('/finance/vendors/{id}/materials', [FinanceController::class, 'addVendorMaterial']);
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
     Route::get('/reports/monthly', [FinanceController::class, 'getMonthlyReports']);
 

@@ -137,6 +137,31 @@ class FinanceController extends Controller
         return response()->json($vendor->load(['materials', 'project']));
     }
 
+    public function addVendorMaterial(Request $request, $id)
+    {
+        $vendor = Vendor::findOrFail($id);
+
+        $data = $request->validate([
+            'material_name' => 'required|string',
+            'unit_price' => 'required|numeric|min:0',
+            'quantity' => 'required|numeric|min:0.01',
+        ]);
+
+        $material = VendorMaterial::create([
+            'vendor_id' => $vendor->id,
+            'material_name' => $data['material_name'],
+            'unit_price' => $data['unit_price'],
+            'quantity' => $data['quantity'],
+            'total_price' => $data['unit_price'] * $data['quantity'],
+        ]);
+
+        return response()->json([
+            'message' => 'Material added successfully.',
+            'material' => $material,
+            'vendor' => $vendor->load(['materials', 'project']),
+        ], 201);
+    }
+
     public function getEmployees()
     {
         $currentMonth = Carbon::now()->month;
