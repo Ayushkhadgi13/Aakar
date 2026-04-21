@@ -30,7 +30,6 @@
             {{ project.status }}
           </span>
           
-          <!-- 3 DOTS MENU (Admin Only) -->
           <div v-if="isAdmin" class="card-dots-wrapper" @click.stop>
             <div class="card-dots" @click="toggleDropdown(project.id)">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
@@ -80,7 +79,6 @@
       </div>
     </div>
 
-    <!-- CREATE/EDIT PROJECT MODAL -->
     <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
       <div class="modal-card">
         <div class="modal-header">
@@ -178,9 +176,6 @@ const startDateRef = ref(null);
 
 const form = ref({ name: '', client_name: '', location: '', budget: '', start_date: '', end_date: '', status: 'Upcoming', progress: 0 });
 
-// ----------------------------------------------------
-// CONSTRUCTION PHASES (Cumulative Percentages)
-// ----------------------------------------------------
 const constructionPhases = [
   { name: 'Not Started', value: 0 },
   { name: 'Design', value: 5 },
@@ -196,7 +191,6 @@ const constructionPhases = [
 ];
 
 const getPhaseName = (progressValue) => {
-  // Find the highest phase that the current progress value has reached or exceeded
   const phase = [...constructionPhases].reverse().find(p => progressValue >= p.value);
   return phase ? phase.name : 'Unknown';
 };
@@ -212,9 +206,6 @@ const fetchProjects = async () => {
   }
 };
 
-// ----------------------------------------------------
-// CALENDAR LOGIC
-// ----------------------------------------------------
 const openPicker = (inputElement) => {
   const target = inputElement?.value || inputElement;
   if (target && typeof target.showPicker === 'function') {
@@ -230,9 +221,6 @@ const formatDateDisplay = (dateStr) => {
   return `${month}/${day}/${year}`;
 };
 
-// ----------------------------------------------------
-// ACTIONS
-// ----------------------------------------------------
 const openCreateModal = () => {
   isEditing.value = false;
   form.value = { name: '', client_name: '', location: '', budget: '', start_date: '', end_date: '', status: 'Upcoming', progress: 0 };
@@ -243,7 +231,6 @@ const openEditModal = (project) => {
   isEditing.value = true;
   editId.value = project.id;
   
-  // Snap old random percentage values to the nearest valid phase for the dropdown to work perfectly
   let snappedProgress = project.progress;
   if (!constructionPhases.some(p => p.value === project.progress)) {
       const phase = [...constructionPhases].reverse().find(p => project.progress >= p.value);
@@ -294,7 +281,6 @@ const deleteProject = async (id) => {
 const goToDetails = (id) => router.push(`/projects/${id}`);
 const toggleDropdown = (id) => { activeDropdown.value = activeDropdown.value === id ? null : id; };
 
-// Architecture-inspired progress colors
 const getProgressColor = (p) => p >= 100 ? '#10B981' : p >= 50 ? '#A65D43' : '#64748B';
 
 onMounted(async () => {
@@ -305,7 +291,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* PAGE LAYOUT - MINIMALIST & ARCHITECTURAL */
 .projects-page { padding: 40px; animation: fadeIn 0.3s ease-out; max-width: 1280px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 32px; }
 .eyebrow { display: inline-block; margin-bottom: 10px; color: var(--primary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -316,7 +301,6 @@ onMounted(async () => {
 .stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .stat-chip strong { font-size: 1.05rem; color: var(--text-main); line-height: 1; }
 
-/* SEARCH BOX */
 .search-box { 
   background: var(--bg-surface); 
   border: 1px solid var(--border); 
@@ -344,7 +328,6 @@ onMounted(async () => {
 }
 .search-icon { color: var(--text-muted); margin-right: 12px; }
 
-/* GRID & CARDS */
 .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
 
 .project-card { 
@@ -360,17 +343,14 @@ onMounted(async () => {
 }
 .project-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--primary) 45%, var(--border) 55%); box-shadow: 0 16px 24px -20px rgba(0,0,0,0.35); }
 
-/* CARD TOP */
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
 .status-badge { padding: 6px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 
-/* BADGE COLORS */
 .upcoming { background: var(--bg-input); color: var(--text-secondary); }
 .in-progress { background: rgba(166, 93, 67, 0.1); color: var(--primary); }
 .on-hold { background: rgba(239, 68, 68, 0.1); color: #EF4444; }
 .completed { background: rgba(16, 185, 129, 0.1); color: #10B981; }
 
-/* 3 DOTS MENU */
 .card-dots-wrapper { position: relative; }
 .card-dots { color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 6px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
 .card-dots:hover { color: var(--text-main); background: var(--bg-input); }
@@ -380,7 +360,6 @@ onMounted(async () => {
 .context-menu button.text-danger { color: var(--danger-text); }
 .context-menu button.text-danger:hover { background: var(--danger-bg); }
 
-/* CARD CONTENT */
 .card-content { flex: 1; margin-bottom: 24px; }
 .card-content h3 { font-size: 1.2rem; margin: 0 0 8px 0; color: var(--text-main); font-weight: 700; line-height: 1.3; }
 .client-name { font-size: 0.9rem; color: var(--text-secondary); margin: 0 0 12px 0; }
@@ -388,25 +367,19 @@ onMounted(async () => {
 .location-tag { font-size: 0.85rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; background: var(--bg-input); padding: 8px 12px; border-radius: 999px; font-weight: 500; border: 1px solid var(--border);}
 .location-tag svg { color: var(--primary); }
 
-/* CARD FOOTER */
 .card-footer { display: flex; justify-content: space-between; margin-bottom: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
 .footer-item small { font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
 .footer-item p { font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0; }
 .text-right { text-align: right; }
 
-/* PROGRESS BAR */
 .progress-section { width: 100%; }
 .progress-info { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .progress-bar-bg { width: 100%; height: 6px; background: var(--bg-input); border-radius: 6px; overflow: hidden; }
 .progress-fill { height: 100%; border-radius: 6px; transition: width 0.8s ease-in-out, background 0.3s; }
 
-/* EMPTY STATE */
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 80px 20px; background: var(--bg-surface); border-radius: 12px; border: 1px dashed var(--border); color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .empty-icon { color: var(--text-muted); opacity: 0.5; }
 
-/* =========================================
-   MODAL & FORMS (Re-used Architectural Style)
-   ========================================= */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: fadeIn 0.2s; padding: 20px; }
 .modal-card { background: var(--bg-surface); width: 520px; padding: 32px; border-radius: 18px; box-shadow: 0 24px 50px rgba(0,0,0,0.12); border: 1px solid var(--border); max-height: 90vh; overflow-y: auto;}
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
@@ -436,7 +409,6 @@ onMounted(async () => {
 }
 .styled-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1); background: var(--bg-surface); }
 
-/* SVG WRAPPERS */
 .select-wrapper { position: relative; width: 100%; }
 .select-wrapper::after {
   content: ''; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px;
@@ -445,7 +417,6 @@ onMounted(async () => {
 }
 .select-wrapper select { padding-right: 48px; cursor: pointer; }
 
-/* POP-OUT DATE PICKER */
 .custom-date-box {
   position: relative; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px; background: transparent; cursor: pointer; transition: all 0.2s ease;
 }
@@ -457,13 +428,11 @@ onMounted(async () => {
 .hidden-date-input { position: absolute; top: 100%; left: 0; width: 0; height: 0; opacity: 0; padding: 0; margin: 0; border: none; pointer-events: none; }
 
 
-/* BUTTONS */
 .btn { padding: 0 24px; height: 46px; border-radius: 10px; font-weight: 700; font-size: 0.94rem; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; letter-spacing: 0.2px; }
 .btn.primary { background: var(--primary); color: white; }
 .btn.primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(166, 93, 67, 0.2); }
 .full-width { width: 100%; margin-top: 10px;}
 
-/* LOADERS */
 .loader-container { padding: 100px; display: flex; justify-content: center; }
 .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
 

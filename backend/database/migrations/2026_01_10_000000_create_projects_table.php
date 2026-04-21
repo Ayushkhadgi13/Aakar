@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->enum('status', ['Upcoming', 'In Progress', 'On Hold', 'Completed'])->default('Upcoming');
             $table->date('start_date');
             $table->date('end_date')->nullable();
-            $table->integer('progress')->default(0); // 0 to 100
+            $table->integer('progress')->default(0);
             $table->timestamps();
         });
     }

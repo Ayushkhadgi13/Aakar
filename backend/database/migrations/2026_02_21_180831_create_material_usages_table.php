@@ -15,8 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
             $table->string('material_name');
-            // Using decimal to allow partial usage (e.g., 1.5 bags), though VendorMaterial uses integer.
-            $table->decimal('quantity_used', 10, 2); 
+            $table->decimal('quantity_used', 10, 2);
             $table->date('date');
             $table->foreignId('logged_by')->constrained('users')->onDelete('cascade');
             $table->timestamps();

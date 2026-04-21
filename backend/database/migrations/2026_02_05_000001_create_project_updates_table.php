@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('project_updates', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Who posted it
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->text('message')->nullable();
-            $table->string('image_path')->nullable(); // For photo uploads
+            $table->string('image_path')->nullable();
             $table->timestamps();
         });
     }

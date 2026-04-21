@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->text('description')->nullable();
-            $table->foreignId('assigned_to')->constrained('users')->onDelete('cascade'); // Who does the task
-            $table->foreignId('assigned_by')->constrained('users')->onDelete('cascade'); // Who created it
+            $table->foreignId('assigned_to')->constrained('users')->onDelete('cascade');
+            $table->foreignId('assigned_by')->constrained('users')->onDelete('cascade');
             $table->enum('status', ['Pending', 'In Progress', 'Completed'])->default('Pending');
             $table->date('due_date')->nullable();
             $table->timestamps();

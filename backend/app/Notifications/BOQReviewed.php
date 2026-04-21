@@ -16,7 +16,7 @@ class BOQReviewed extends Notification
     public function __construct(ProjectDocument $document, string $status)
     {
         $this->document = $document;
-        $this->status = $status; // 'approved' or 'rejected'
+        $this->status = $status;
     }
 
     public function via(object $notifiable): array

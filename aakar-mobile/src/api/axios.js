@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Prefer an explicit env override first.
+// Let local development override the inferred Expo host when needed.
 const ENV_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
 const FALLBACK_LAN_BASE_URL = 'http://192.168.31.16:8000/api';
 const IOS_SIMULATOR_BASE_URL = 'http://localhost:8000/api';
@@ -28,7 +28,7 @@ const getDefaultBaseUrl = () => {
     return expoHostBaseUrl;
   }
 
-  // If Expo host info is unavailable, keep localhost only for iOS simulator style flows.
+  // iOS simulators can still reach a backend on the host machine via localhost.
   if (Platform.OS === 'ios') {
     return IOS_SIMULATOR_BASE_URL;
   }

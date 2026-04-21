@@ -23,7 +23,6 @@
       </div>
     </header>
 
-    <!-- SEARCH & DATE FILTERS -->
     <div class="filter-panel" v-if="isAdmin">
       <div class="filter-group project-filter">
         <label>Filter by Project</label>
@@ -126,7 +125,6 @@
       </div>
     </div>
 
-    <!-- KPI STATS -->
     <section class="stats-container" v-if="isAdmin && summary">
       <div class="stat-box">
         <span class="stat-label">Available Balance</span>
@@ -142,10 +140,7 @@
       </div>
     </section>
 
-    <!-- IN-DEPTH CHARTS -->
     <div class="detailed-charts" v-if="isAdmin && summary">
-        
-        <!-- STACKED CHART: Monthly breakdown -->
         <div class="chart-card full-width-chart">
             <div class="chart-header">
               <h3>Monthly Expense Breakdown by Project</h3>
@@ -153,7 +148,6 @@
             <apexchart type="bar" height="380" :options="trendChartOptions" :series="trendSeries" />
         </div>
 
-        <!-- Expense Distribution -->
         <div class="chart-card">
             <div class="chart-header">
               <h3>Expenses by Category</h3>
@@ -162,7 +156,6 @@
             <apexchart type="donut" height="320" :options="categoryChartOptions" :series="categorySeries" />
         </div>
 
-        <!-- Material Cost Details -->
         <div class="chart-card">
             <div class="chart-header">
               <h3>Specific Material Costs</h3>
@@ -173,7 +166,6 @@
     </div>
 
     <div class="finance-grid" :class="{ 'full-width': !isAdmin }">
-      <!-- EMPLOYEE PAYROLL -->
       <section class="content-card" v-if="isAdmin">
         <div class="card-head">
           <div class="head-title">
@@ -245,7 +237,6 @@
         </div>
       </section>
     </div>
-    <!-- TRANSACTION MODAL -->
     <div v-if="showTransactionModal" class="modal-backdrop" @click.self="showTransactionModal = false">
       <div class="modal-card">
         <div class="modal-header">
@@ -354,9 +345,6 @@ const filters = ref({ start_date: '', end_date: '', project_id: '' });
 const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const activeCalendar = ref(null);
 
-// ----------------------------------------------------
-// HELPER FUNCTIONS
-// ----------------------------------------------------
 const formatDateDisplay = (dateStr) => {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-');
@@ -463,9 +451,6 @@ const closeCalendar = () => {
   activeCalendar.value = null;
 };
 
-// ----------------------------------------------------
-// CHARTS SETUP - ARCHITECTURAL MINIMALIST STYLING
-// ----------------------------------------------------
 const chartFont = 'Plus Jakarta Sans, sans-serif';
 const archColors = ['#A65D43', '#475569', '#94A3B8', '#D97706', '#1E293B', '#64748B'];
 
@@ -511,7 +496,6 @@ const categoryChartOptions = ref({
 const materialSeries = ref([]);
 const materialChartOptions = ref({
     chart: { type: 'bar', toolbar: { show: false }, fontFamily: chartFont },
-    // Horizontal bars: Data is on X, Categories are on Y
     plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '50%' } },
     dataLabels: { enabled: false },
     xaxis: { 
@@ -605,7 +589,6 @@ const loadData = async () => {
       materialChartOptions.value = {
           ...materialChartOptions.value,
           xaxis: { ...materialChartOptions.value.xaxis },
-          // Insert category names into xaxis configuration for horizontal bar charts
           xaxis: { ...materialChartOptions.value.xaxis, categories: matStats.map(m => m.material_name) }
       };
     }
@@ -649,7 +632,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* PAGE LAYOUT - MINIMALIST & ARCHITECTURAL */
 .finance-page { padding: 40px; animation: fadeIn 0.3s ease-out; max-width: 1280px; margin: 0 auto; }
 .finance-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 32px; }
 .eyebrow { display: inline-block; margin-bottom: 10px; color: var(--primary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -662,21 +644,18 @@ onUnmounted(() => {
 .stat-chip strong { font-size: 1.05rem; color: var(--text-main); line-height: 1; }
 .action-buttons { display: flex; gap: 12px; }
 
-/* =========================================
-   GLOBAL INPUT RESET & CUSTOM STYLING 
-   ========================================= */
 .styled-input {
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
-  height: 48px; /* Bigger inputs */
+  height: 48px;
   padding: 12px 16px;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-main);
   font-family: inherit;
-  font-size: 1rem; /* Larger font */
+  font-size: 1rem;
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
@@ -687,9 +666,8 @@ textarea.styled-input { height: auto; }
   box-shadow: 0 0 0 4px rgba(166, 93, 67, 0.1);
   background: var(--bg-surface);
 }
-.styled-input.solid { background: var(--bg-surface); } /* Used inside grey areas */
+.styled-input.solid { background: var(--bg-surface); }
 
-/* CUSTOM SVG WRAPPER FOR SELECT */
 .select-wrapper { position: relative; width: 100%; }
 .select-wrapper::after {
   content: '';
@@ -702,11 +680,10 @@ textarea.styled-input { height: auto; }
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-size: contain;
-  pointer-events: none; /* Crucial: lets click pass through to the native select */
+  pointer-events: none;
 }
 .select-wrapper select { padding-right: 48px; cursor: pointer; }
 
-/* COMPLETELY CUSTOM DATE PICKER */
 .custom-date-box {
   position: relative;
   display: flex;
@@ -867,9 +844,6 @@ textarea.styled-input { height: auto; }
   color: var(--text-main);
 }
 
-/* =========================================
-   FILTERS PANEL 
-   ========================================= */
 .filter-panel { 
   display: flex; 
   flex-wrap: wrap; 
@@ -882,13 +856,10 @@ textarea.styled-input { height: auto; }
   border: 1px solid var(--border);
 }
 .filter-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
-.project-filter { flex: 2; } /* Make project select wider */
+.project-filter { flex: 2; }
 .filter-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .filter-action { flex: 0; }
 
-/* =========================================
-   BUTTONS
-   ========================================= */
 .btn { padding: 0 24px; height: 46px; border-radius: 10px; font-weight: 700; font-size: 0.94rem; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; letter-spacing: 0.2px; }
 .btn.primary { background: var(--primary); color: white; }
 .btn.primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(166, 93, 67, 0.2); }
@@ -910,9 +881,6 @@ textarea.styled-input { height: auto; }
 .btn-icon.danger { color: var(--text-muted); }
 .btn-icon.danger:hover { background: var(--danger-bg); color: var(--danger-text); }
 
-/* =========================================
-   KPI CARDS
-   ========================================= */
 .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px; }
 .stat-box { background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-input) 18%); padding: 28px; border-radius: 18px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
 .stat-box:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border) 55%); transform: translateY(-2px); box-shadow: 0 16px 24px -20px rgba(0,0,0,0.35); }
@@ -921,9 +889,6 @@ textarea.styled-input { height: auto; }
 .positive { color: #10B981; }
 .negative { color: #EF4444; }
 
-/* =========================================
-   CHARTS SECTION
-   ========================================= */
 .detailed-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; }
 .chart-card { background: var(--bg-surface); padding: 28px; border-radius: 18px; border: 1px solid var(--border); display: flex; flex-direction: column;}
 .full-width-chart { grid-column: 1 / -1; }
@@ -931,9 +896,6 @@ textarea.styled-input { height: auto; }
 .chart-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
 .chart-subtitle { font-size: 0.85rem; color: var(--text-muted); }
 
-/* =========================================
-   CONTENT GRID (Tables & Lists)
-   ========================================= */
 .finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .finance-grid.full-width { grid-template-columns: 1fr; }
 
@@ -943,7 +905,6 @@ textarea.styled-input { height: auto; }
 .month-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;}
 .badge { background: var(--bg-surface); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; border: 1px solid var(--border); }
 
-/* TABLES */
 .table-wrapper { width: 100%; overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; text-align: left; }
 .data-table th { padding: 16px 30px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
@@ -957,11 +918,9 @@ textarea.styled-input { height: auto; }
 .font-bold { font-weight: 800; font-size: 1.1rem; }
 .text-main { color: var(--text-main); }
 
-/* STATUS BADGES */
 .status-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; }
 .status-badge.success { background: rgba(16, 185, 129, 0.1); color: #059669; }
 
-/* ACTIVITY LIST */
 .activity-list { display: flex; flex-direction: column; overflow-y: auto; max-height: 450px; }
 .activity-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 30px; border-bottom: 1px solid var(--border); transition: background 0.2s; }
 .activity-item:last-child { border-bottom: none; }
@@ -981,9 +940,6 @@ textarea.styled-input { height: auto; }
 .activity-amount.expense,
 .activity-amount.pre-payment { color: #dc2626; }
 
-/* =========================================
-   MODALS
-   ========================================= */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: fadeIn 0.2s ease; padding: 20px; }
 .modal-card { background: var(--bg-surface); padding: 32px; border-radius: 18px; width: 500px; border: 1px solid var(--border); box-shadow: 0 24px 50px rgba(0,0,0,0.12); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
 .modal-card.wide { width: 750px; }
@@ -992,12 +948,10 @@ textarea.styled-input { height: auto; }
 .close-btn { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: 0.2s; }
 .close-btn:hover { background: var(--bg-input); color: var(--text-main); }
 
-/* FORMS IN MODALS */
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .form-group { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
 .form-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
 
-/* BUILDER (Vendor Materials) */
 .material-builder { border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 10px 0 30px 0; background: var(--bg-input); }
 .builder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .builder-header label { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
@@ -1005,7 +959,6 @@ textarea.styled-input { height: auto; }
 .builder-row { display: grid; grid-template-columns: 2fr 1fr 1fr 40px; gap: 16px; margin-bottom: 12px; align-items: center; }
 .builder-row:last-child { margin-bottom: 0; }
 
-/* VENDOR PROFILE (Modal Details) */
 .detail-content { display: flex; flex-direction: column; gap: 30px; }
 .vendor-profile { background: var(--bg-input); border: 1px solid var(--border); padding: 24px; border-radius: 8px; display: flex; flex-direction: column; gap: 20px; }
 .vp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }

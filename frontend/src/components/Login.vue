@@ -31,9 +31,6 @@
         </form>
 
         <div v-if="error" class="error-box">{{ error }}</div>
-
-        <!-- REMOVED REGISTER LINK -->
-        <!-- <div class="footer-links">...</div> -->
       </div>
     </div>
 

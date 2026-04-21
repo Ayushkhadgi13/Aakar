@@ -52,8 +52,6 @@ class MaterialController extends Controller
     {
         $project = Project::findOrFail($projectId);
 
-        // 1. Get Total Purchased Quantity per Material
-        // Efficiently sums up quantities via SQL Group By
         $purchased = VendorMaterial::whereHas('vendor', function ($q) use ($projectId) {
             $q->where('project_id', $projectId);
         })
@@ -62,15 +60,12 @@ class MaterialController extends Controller
         ->get()
         ->keyBy('material_name');
 
-        // 2. Get Total Consumed Quantity per Material
         $consumed = MaterialUsage::where('project_id', $projectId)
         ->select('material_name', DB::raw('SUM(quantity_used) as total_used'))
         ->groupBy('material_name')
         ->get()
         ->keyBy('material_name');
 
-        // 3. Merge and Calculate Stock
-        // Get all unique material names from both lists
         $allMaterials = $purchased->keys()->merge($consumed->keys())->unique()->values();
 
         $inventory = $allMaterials->map(function ($name) use ($purchased, $consumed) {
@@ -83,7 +78,6 @@ class MaterialController extends Controller
                 'total_purchased' => $totalPurchased,
                 'total_used' => $totalUsed,
                 'current_stock' => $currentStock,
-                // Status indicator for frontend UI
                 'status' => $currentStock <= 0 ? 'Out of Stock' : ($currentStock < ($totalPurchased * 0.2) ? 'Low Stock' : 'Good')
             ];
         });

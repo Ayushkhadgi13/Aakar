@@ -11,7 +11,6 @@ class StoreProjectRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // This ensures only a logged-in user with the 'admin' role can create a project.
         return $this->user() && $this->user()->role === 'admin';
     }
 

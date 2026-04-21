@@ -7,7 +7,6 @@ import TasksScreen from '../screens/TasksScreen';
 import { AuthContext } from '../context/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Mock React Native Alert
 jest.spyOn(Alert, 'alert');
 
 const mockAxios = new MockAdapter(api);
@@ -40,7 +39,6 @@ describe('TasksScreen', () => {
 
     const { getByText } = renderWithContext(<TasksScreen />);
 
-    // Wait for the API call to resolve and UI to update
     await waitFor(() => {
       expect(getByText('Build Foundation')).toBeTruthy();
       expect(getByText('Pending')).toBeTruthy();
@@ -59,11 +57,9 @@ describe('TasksScreen', () => {
 
     await waitFor(() => expect(getByText('Build Foundation')).toBeTruthy());
 
-    // Find the update status button (React Native picker mock/workaround)
     const inProgressButton = getByText('In Progress');
     fireEvent.press(inProgressButton);
 
-    // Assert the PUT request was made
     await waitFor(() => {
       expect(mockAxios.history.put.length).toBe(1);
       expect(JSON.parse(mockAxios.history.put[0].data)).toEqual({ status: 'In Progress' });
@@ -71,12 +67,10 @@ describe('TasksScreen', () => {
   });
 
   it('MT-05: Verifies app handles network errors without crashing', async () => {
-    // Simulate a network error
     mockAxios.onGet('/tasks').networkError();
 
     renderWithContext(<TasksScreen />);
 
-    // Wait for the catch block to trigger the alert
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Network Error',

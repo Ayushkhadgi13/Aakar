@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('material_name');
             $table->integer('estimated_quantity');
             $table->decimal('estimated_unit_price', 15, 2);
-            $table->string('unit'); // e.g., kg, bags, tons
+            $table->string('unit');
             $table->timestamps();
         });
     }

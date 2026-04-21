@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-wrapper">
-    <!-- TOP NAVIGATION BAR -->
     <nav class="top-navbar">
       <div class="nav-inner">
         <div class="brand-box clickable" @click="router.push('/dashboard')" title="Go to Dashboard">
@@ -21,7 +20,6 @@
         </div>
 
         <div class="user-actions">
-          <!-- NOTIFICATIONS BELL -->
           <div class="notif-wrapper" @click.stop>
             <button class="icon-btn" @click="toggleNotifMenu">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
@@ -84,13 +82,11 @@
       </div>
     </nav>
 
-    <!-- MAIN CONTENT -->
     <main class="main-content">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in"><component :is="Component" /></transition>
       </router-view>
 
-      <!-- ADMIN DASHBOARD -->
       <div v-if="$route.path === '/dashboard' && user?.role === 'admin'" class="overview-container">
         <header class="page-header">
           <div class="header-text">
@@ -147,7 +143,6 @@
         </div>
       </div>
 
-      <!-- EMPLOYEE DASHBOARD -->
       <div v-if="$route.path === '/dashboard' && user?.role !== 'admin'" class="overview-container">
         <header class="page-header">
           <div class="header-text">
@@ -212,10 +207,8 @@ import { useAuth } from '../useAuth';
 
 const router = useRouter();
 
-// Shared auth state
 const { user, notifications, unreadCount, loadUser, markAsRead, markAllRead, logout } = useAuth();
 
-// Dashboard-only state
 const summary = ref(null);
 const projects = ref([]);
 const empStats = ref(null);
@@ -251,7 +244,7 @@ const financeSeries = computed(() => [
 
 const financeChartOptions = ref({
   chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'Plus Jakarta Sans' },
-  colors: ['#10B981', '#EF4444'], // Minimal flat colors
+  colors: ['#10B981', '#EF4444'],
   plotOptions: { bar: { horizontal: false, columnWidth: '30%', borderRadius: 4, borderRadiusApplication: 'end' } },
   dataLabels: { enabled: false },
   stroke: { show: false },
@@ -264,7 +257,7 @@ const financeChartOptions = ref({
   yaxis: { 
     labels: { style: { colors: '#94A3B8', fontSize: '12px', fontWeight: 500 }, formatter: (val) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val } 
   },
-  grid: { show: false }, // Removed grid for minimalist look
+  grid: { show: false },
   legend: { show: false },
   tooltip: { theme: 'light', y: { formatter: (val) => `Rs. ${val.toLocaleString()}` } }
 });
@@ -328,7 +321,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* NAVBAR - MINIMALIST */
 .top-navbar { position: fixed; top: 0; left: 0; width: 100%; height: 74px; background: color-mix(in srgb, var(--bg-surface) 88%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, transparent); backdrop-filter: blur(14px); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .nav-inner { width: 100%; max-width: 1200px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; }
 .brand-box { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; letter-spacing: 1px; color: var(--text-main); }
@@ -381,14 +373,12 @@ onUnmounted(() => {
 .info-label { font-size: 0.8rem; color: var(--text-secondary); }
 .info-value { font-size: 0.8rem; color: var(--text-main); font-weight: 600; }
 
-/* MAIN CONTENT - MINIMALIST */
 .main-content { padding-top: 108px; padding-bottom: 60px; max-width: 1200px; margin: 0 auto; padding-left: 40px; padding-right: 40px; }
 
 .page-header { margin-bottom: 40px; }
 .header-text h1 { font-size: 1.95rem; font-weight: 800; color: var(--text-main); margin: 0 0 8px 0; letter-spacing: -0.04em; }
 .header-text p { color: var(--text-secondary); font-size: 0.95rem; margin: 0; }
 
-/* KPI GRID */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 32px; }
 .kpi-card { background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-input) 18%); padding: 24px; border-radius: 18px; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; display: flex; flex-direction: column; gap: 16px; }
 .kpi-card:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border) 55%); transform: translateY(-2px); box-shadow: 0 16px 24px -20px rgba(0,0,0,0.35); }
@@ -403,7 +393,6 @@ onUnmounted(() => {
 .pending { background: rgba(245, 158, 11, 0.1); }
 .progress { background: rgba(59, 130, 246, 0.1); }
 
-/* CHARTS GRID */
 .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
 .chart-card { background: var(--bg-surface); padding: 24px; border-radius: 18px; border: 1px solid var(--border); }
 .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -413,7 +402,6 @@ onUnmounted(() => {
 .dot.inc { background: #10B981; }
 .dot.exp { background: #EF4444; }
 
-/* EMPLOYEE SECTION */
 .emp-section { background: var(--bg-surface); padding: 24px; border-radius: 18px; border: 1px solid var(--border); }
 .emp-section h3 { margin: 0 0 24px 0; color: var(--text-main); font-size: 1.1rem; font-weight: 600; }
 .empty-state { text-align: center; color: var(--text-muted); padding: 32px 0; font-size: 0.9rem; }
@@ -431,12 +419,10 @@ onUnmounted(() => {
 .pending { background: rgba(245, 158, 11, 0.1); color: #D97706; border-color: transparent; }
 .completed { background: rgba(16, 185, 129, 0.1); color: #059669; border-color: transparent; }
 
-/* TRANSITIONS */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-/* RESPONSIVE */
 @media (max-width: 1024px) { 
   .charts-grid { grid-template-columns: 1fr; } 
   .nav-links { display: none; } 

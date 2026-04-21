@@ -10,8 +10,6 @@ return new class extends Migration
     {
         Schema::table('project_documents', function (Blueprint $table) {
             $table->string('status')->default('approved')->after('file_path');
-            // Default is 'approved' so existing documents are unaffected.
-            // BOQ files uploaded going forward will be set to 'pending'.
         });
     }
 

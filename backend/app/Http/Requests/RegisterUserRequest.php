@@ -11,7 +11,7 @@ class RegisterUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true; // Public endpoint
+        return true;
     }
 
     /**

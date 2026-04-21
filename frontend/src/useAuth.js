@@ -1,28 +1,18 @@
 import { ref, computed } from 'vue'
 import axios from 'axios'
 
-// Module-level singletons — shared across all components
 const user = ref(null)
 const notifications = ref([])
-
-// Promise lock — if a fetch is already in flight, all callers wait for the
-// same promise instead of each firing their own request
 let _fetchPromise = null
 
 export function useAuth() {
-
   const unreadCount = computed(() => notifications.value.length)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   const loadUser = () => {
-    // If already loaded, return immediately
     if (user.value !== null) return Promise.resolve()
-
-    // If a fetch is already in flight, return the same promise
-    // so all concurrent callers share the result
     if (_fetchPromise) return _fetchPromise
 
-    // First caller starts the fetch and stores the promise
     _fetchPromise = Promise.all([
       axios.get('/user'),
       axios.get('/notifications')
@@ -35,7 +25,6 @@ export function useAuth() {
         window.location.href = '/login'
       }
     }).finally(() => {
-      // Clear the lock so future calls after logout can re-fetch
       _fetchPromise = null
     })
 

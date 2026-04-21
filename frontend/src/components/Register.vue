@@ -38,7 +38,6 @@
       </div>
     </div>
 
-    <!-- CUSTOM SUCCESS POPUP MODAL -->
     <div v-if="showSuccessModal" class="modal-overlay">
       <div class="modal-content">
         <div class="icon-circle">
@@ -51,8 +50,6 @@
         <button @click="redirectToLogin" class="btn-modal">Go to Login</button>
       </div>
     </div>
-    <!-- END MODAL -->
-
   </div>
 </template>
 
@@ -99,12 +96,10 @@ const redirectToLogin = () => {
 </script>
 
 <style scoped>
-/* --- MAIN PAGE STYLES --- */
 .auth-wrapper {
   position: relative;
   height: 100vh;
   width: 100%;
-  /* Gradient background adapted for dark/light via variables if needed, currently keeping static gray gradient for auth */
   background: linear-gradient(135deg, var(--bg-body) 0%, var(--bg-input) 100%);
   display: flex;
   justify-content: center;
@@ -117,7 +112,6 @@ const redirectToLogin = () => {
   background: var(--bg-surface);
   padding: 2.5rem;
   border-radius: 12px;
-  /* Soft shadow for depth */
   box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 400px;
@@ -209,7 +203,6 @@ input:focus {
 }
 .card-footer a { color: var(--warning-text); }
 
-/* --- POPUP MODAL STYLES --- */
 .modal-overlay {
   position: fixed;
   top: 0;

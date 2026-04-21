@@ -6,14 +6,12 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
-use App\Http\Requests\RegisterUserRequest; // Import Request
+use App\Http\Requests\RegisterUserRequest;
 
 class AuthController extends Controller
 {
-    // Register User (Save to Database)
     public function register(RegisterUserRequest $request)
     {
-        // Validation is handled automatically by RegisterUserRequest
         $validatedData = $request->validated();
 
         $user = User::create([
@@ -30,7 +28,6 @@ class AuthController extends Controller
         ]);
     }
 
-    // Login User
     public function login(Request $request)
     {
         if (!Auth::attempt($request->only('email', 'password'))) {
@@ -50,10 +47,8 @@ class AuthController extends Controller
         ]);
     }
 
-    // Logout User
     public function logout(Request $request)
     {
-        // Revoke the token that was used to authenticate the current request
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

@@ -12,9 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('transactions', function (Blueprint $table) {
-            // Adds the project_id column. 
-            // It is nullable so general expenses don't require a project.
-            // nullOnDelete ensures if a project is deleted, the transaction history isn't lost.
             $table->foreignId('project_id')
                   ->nullable()
                   ->constrained('projects')
@@ -28,7 +25,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('transactions', function (Blueprint $table) {
-            // Safely removes the relationship and column if you ever rollback
             $table->dropForeign(['project_id']);
             $table->dropColumn('project_id');
         });

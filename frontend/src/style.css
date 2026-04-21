@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* LIGHT MODE VARIABLES */
   --bg-body: #F8F9FB;
   --bg-surface: #FFFFFF;
   --bg-nav: rgba(255, 255, 255, 0.85);
@@ -30,7 +29,6 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* DARK MODE VARIABLES */
 [data-theme='dark'] {
   --bg-body: #0f172a;
   --bg-surface: #1e293b;
@@ -73,7 +71,6 @@ button, input, select, textarea {
   font-family: inherit;
 }
 
-/* SCROLLBAR STYLING FOR DARK MODE */
 [data-theme='dark'] ::-webkit-scrollbar {
   width: 8px;
 }

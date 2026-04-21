@@ -14,20 +14,16 @@ use App\Http\Controllers\NotificationController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Enable broadcasting auth routes via Sanctum so Echo can connect securely
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::middleware('auth:sanctum')->group(function () {
-
     Route::post('/logout',[AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) { return $request->user(); });
 
-    // Notification Routes
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 
-    // Finance Routes
     Route::get('/finance/summary', [FinanceController::class, 'getSummary']);
     Route::get('/finance/vendors', [FinanceController::class, 'getVendors']);
     Route::post('/finance/vendors', [FinanceController::class, 'storeVendor']);
@@ -35,16 +31,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
     Route::get('/reports/monthly', [FinanceController::class, 'getMonthlyReports']);
 
-    // Payroll Routes
     Route::get('/finance/employees', [FinanceController::class, 'getEmployees']);
     Route::post('/finance/employees',[FinanceController::class, 'storeEmployee']);
     Route::post('/finance/employees/{id}/pay',[FinanceController::class, 'paySalary']);
 
-    // System Employee Management Routes
     Route::get('/system/employees', [EmployeeController::class, 'index']);
     Route::post('/system/employees',[EmployeeController::class, 'store']);
 
-    // Project Module Routes
     Route::get('/projects',[ProjectController::class, 'index']);
     Route::post('/projects', [ProjectController::class, 'store']);
     Route::get('/projects/{id}', [ProjectController::class, 'show']);
@@ -55,26 +48,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/projects/{id}/members', [ProjectController::class, 'addMembers']);
     Route::delete('/projects/{id}/members/{userId}', [ProjectController::class, 'removeMember']);
 
-    // Project Specifics
     Route::post('/projects/{id}/updates',[ProjectController::class, 'addUpdate']);
     Route::post('/projects/{id}/documents',[ProjectController::class, 'uploadDocument']);
 
-    // Document Review (Admin Only)
     Route::patch('/documents/{id}/approve', [ProjectController::class, 'approveDocument']);
     Route::patch('/documents/{id}/reject', [ProjectController::class, 'rejectDocument']);
     Route::delete('/documents/{id}',[ProjectController::class, 'deleteDocument']);
 
-    // BOQ & Estimates
     Route::post('/projects/{id}/estimates', [ProjectController::class, 'storeEstimates']);
     Route::get('/projects/{id}/boq', [ProjectController::class, 'getBOQAnalysis']);
     Route::get('/projects/{id}/materials/comparison', [ProjectController::class, 'getMaterialComparison']);
     Route::get('/projects/{id}/financial-variance', [ProjectController::class, 'getFinancialVariance']);
 
-    // Material Routes
     Route::post('/materials/usage', [MaterialController::class, 'logUsage']);
     Route::get('/projects/{id}/inventory', [MaterialController::class, 'getInventoryStatus']);
 
-    // Task Routes
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::get('/tasks/stats',[TaskController::class, 'userStats']);
     Route::get('/users-list',[TaskController::class, 'getUsers']);

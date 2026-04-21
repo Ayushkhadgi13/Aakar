@@ -9,7 +9,7 @@ class Authenticate extends Middleware
 {
     protected function redirectTo(Request $request): ?string
     {
-        // Never redirect for API routes — return null to force a 401 JSON response
+        // API requests should receive a 401 response instead of an HTML redirect.
         return null;
     }
 }

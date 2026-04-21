@@ -13,19 +13,15 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            // UPDATE THIS LINE: Added 'pre-payment' to the list
-            $table->enum('type', ['income', 'expense', 'pre-payment']); 
+            $table->enum('type', ['income', 'expense', 'pre-payment']);
             $table->decimal('amount', 15, 2);
             $table->string('category');
             $table->date('date');
             $table->text('description')->nullable();
-            
-            // Link to the vendors table
             $table->foreignId('vendor_id')
                   ->nullable()
                   ->constrained('vendors')
                   ->onDelete('set null');
-                  
             $table->timestamps();
         });
     }

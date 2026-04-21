@@ -18,13 +18,11 @@ class ProjectUpdatePosted implements ShouldBroadcastNow
 
     public function __construct(ProjectUpdate $update)
     {
-        // Load the user relation immediately so the frontend knows who sent the message
         $this->update = $update->load('user');
     }
 
     public function broadcastOn(): array
     {
-        // Broadcast specifically to the private channel of the active project
         return[
             new PrivateChannel('project.' . $this->update->project_id),
         ];
