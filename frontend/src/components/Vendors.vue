@@ -38,7 +38,7 @@
           <tr v-if="vendors.length === 0">
             <td colspan="4" class="text-center">No vendors found.</td>
           </tr>
-          <tr v-for="vendor in vendors" :key="vendor.id">
+          <tr v-for="vendor in vendors" :key="vendor.id" class="clickable-row" @click="viewVendor(vendor)">
             <td>
               <div class="user-cell">
                 <div class="avatar">{{ vendor.name.charAt(0) }}</div>
@@ -54,6 +54,68 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="showDetailModal && selectedVendor" class="modal-backdrop" @click.self="showDetailModal = false">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h3>Vendor Details</h3>
+          <button @click="showDetailModal = false" class="close-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-card">
+            <span class="detail-label">Vendor</span>
+            <strong>{{ selectedVendor.name }}</strong>
+          </div>
+          <div class="detail-card">
+            <span class="detail-label">Project</span>
+            <strong>{{ selectedVendor.project?.name || 'Unassigned' }}</strong>
+          </div>
+          <div class="detail-card">
+            <span class="detail-label">Contact Person</span>
+            <strong>{{ selectedVendor.contact_person || 'Not provided' }}</strong>
+          </div>
+          <div class="detail-card">
+            <span class="detail-label">Phone</span>
+            <strong>{{ selectedVendor.phone || 'Not provided' }}</strong>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="section-head">
+            <div>
+              <h4>Supplied Materials</h4>
+              <p>Material list and total procurement value for this vendor.</p>
+            </div>
+            <span class="total-pill">Rs. {{ calculateVendorTotal(selectedVendor.materials).toLocaleString() }}</span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!selectedVendor.materials?.length">
+                <td colspan="4" class="text-center">No material records found.</td>
+              </tr>
+              <tr v-for="material in selectedVendor.materials" :key="material.id">
+                <td>{{ material.material_name }}</td>
+                <td>{{ material.quantity }}</td>
+                <td>Rs. {{ Number(material.unit_price || 0).toLocaleString() }}</td>
+                <td>Rs. {{ Number(material.total_price || 0).toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div v-if="showModal" class="modal-backdrop" @click.self="showModal = false">
@@ -124,6 +186,8 @@ const { isAdmin, loadUser } = useAuth();
 const vendors = ref([]);
 const projects = ref([]);
 const showModal = ref(false);
+const showDetailModal = ref(false);
+const selectedVendor = ref(null);
 const isSaving = ref(false);
 const form = ref({
   name: '',
@@ -151,6 +215,11 @@ const fetchPageData = async () => {
 
 const openModal = () => {
   showModal.value = true;
+};
+
+const viewVendor = (vendor) => {
+  selectedVendor.value = vendor;
+  showDetailModal.value = true;
 };
 
 const addMaterial = () => {
@@ -185,6 +254,9 @@ const saveVendor = async () => {
   }
 };
 
+const calculateVendorTotal = (materials = []) =>
+  materials.reduce((sum, material) => sum + Number(material.total_price || 0), 0);
+
 onMounted(fetchPageData);
 </script>
 
@@ -209,6 +281,7 @@ onMounted(fetchPageData);
 .data-table td { padding: 18px 24px; border-bottom: 1px solid var(--border); color: var(--text-body); font-size: 0.95rem; }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tbody tr:hover { background: color-mix(in srgb, var(--bg-surface) 75%, var(--bg-input) 25%); }
+.clickable-row { cursor: pointer; }
 
 .user-cell { display: flex; align-items: center; gap: 12px; }
 .avatar { width: 38px; height: 38px; background: var(--primary); color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
@@ -218,9 +291,19 @@ onMounted(fetchPageData);
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.42); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
 .modal-card { background: var(--bg-surface); padding: 32px; border-radius: 18px; width: 560px; border: 1px solid var(--border); box-shadow: 0 24px 50px rgba(0,0,0,0.12); max-height: 90vh; overflow-y: auto; }
+.modal-card.wide { width: 860px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .modal-header h3 { color: var(--text-main); margin: 0; font-size: 1.3rem; font-weight: 800; }
 .modal-hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px; background: var(--bg-input); padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--border); }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+.detail-card { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: color-mix(in srgb, var(--bg-surface) 76%, var(--bg-input) 24%); display: flex; flex-direction: column; gap: 6px; }
+.detail-label { font-size: 0.76rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+.detail-card strong { color: var(--text-main); font-size: 1rem; }
+.detail-section { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 20px; background: color-mix(in srgb, var(--bg-surface) 72%, var(--bg-input) 28%); border-bottom: 1px solid var(--border); }
+.section-head h4 { margin: 0 0 4px; color: var(--text-main); font-size: 1rem; }
+.section-head p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
+.total-pill { background: var(--primary); color: white; border-radius: 999px; padding: 10px 14px; font-weight: 700; white-space: nowrap; }
 .form-group { margin-bottom: 18px; display: flex; flex-direction: column; gap: 8px; }
 .form-group label { font-size: 0.82rem; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.08em; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -257,7 +340,9 @@ onMounted(fetchPageData);
   .employees-page { padding: 24px 20px; }
   .data-table th,
   .data-table td { padding-left: 16px; padding-right: 16px; }
+  .detail-grid,
   .form-row,
   .material-row { grid-template-columns: 1fr; }
+  .section-head { flex-direction: column; align-items: stretch; }
 }
 </style>

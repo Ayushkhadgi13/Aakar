@@ -9,8 +9,8 @@
       <div class="header-right">
         <div v-if="isAdmin && summary" class="header-stats">
           <div class="stat-chip">
-            <span class="stat-label">Vendors</span>
-            <strong>{{ vendors.length }}</strong>
+            <span class="stat-label">This Period</span>
+            <strong>{{ summary.activity_period_label || currentMonthLabel }}</strong>
           </div>
           <div class="stat-chip">
             <span class="stat-label">Projects</span>
@@ -18,7 +18,6 @@
           </div>
         </div>
         <div v-if="isAdmin" class="action-buttons">
-          <button @click="showVendorModal = true" class="btn secondary">New Vendor</button>
           <button @click="showTransactionModal = true" class="btn primary">Add Transaction</button>
         </div>
       </div>
@@ -212,165 +211,41 @@
         </div>
       </section>
 
-      <!-- VENDOR LIST -->
       <section class="content-card">
         <div class="card-head">
           <div class="head-title">
-            <h2>Vendor Directory</h2>
+            <h2>Monthly Activity</h2>
+            <span class="month-label">{{ summary.activity_period_label || currentMonthLabel }}</span>
           </div>
+          <span class="badge">{{ summary.monthly_activity?.length || 0 }} Entries</span>
         </div>
         
-        <div class="vendor-list">
-          <div v-if="vendors.length === 0" class="text-center text-muted" style="padding: 30px;">
-            No vendors registered yet.
+        <div class="activity-list">
+          <div v-if="!summary.monthly_activity?.length" class="text-center text-muted" style="padding: 30px;">
+            No income or expense activity found for this period.
           </div>
           <div
-            v-for="vendor in vendors"
-            :key="vendor.id"
-            class="vendor-item"
-            @click="viewVendor(vendor)"
+            v-for="activity in summary.monthly_activity"
+            :key="activity.id"
+            class="activity-item"
           >
-            <div class="v-info">
-              <h3>{{ vendor.name }}</h3>
-              <span class="v-project">{{ vendor.project?.name || 'General / Unlinked' }}</span>
-              <span class="v-meta" v-if="vendor.contact_person">Contact: {{ vendor.contact_person }}</span>
+            <div class="activity-main">
+              <div class="activity-top">
+                <span class="activity-type" :class="activity.type">{{ activity.type }}</span>
+                <span class="activity-date">{{ formatDateDisplay(activity.date) }}</span>
+              </div>
+              <h3>{{ activity.category }}</h3>
+              <span class="activity-project">{{ activity.project?.name || 'General / Unassigned' }}</span>
+              <p class="activity-description">{{ activity.description || 'No additional note provided.' }}</p>
             </div>
-            <div class="v-amount">Rs. {{ calculateVendorTotal(vendor.materials).toLocaleString() }}</div>
+            <div class="activity-amount" :class="activity.type">
+              {{ activity.type === 'income' ? '+' : '-' }}Rs. {{ Number(activity.amount || 0).toLocaleString() }}
+            </div>
           </div>
         </div>
       </section>
     </div>
-
-    <!-- 1. VENDOR DETAILS MODAL -->
-    <div v-if="showDetailModal && selectedVendor" class="modal-backdrop" @click.self="showDetailModal = false">
-      <div class="modal-card wide">
-        <div class="modal-header">
-          <h3>Vendor Details</h3>
-          <button @click="showDetailModal = false" class="close-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-        <div class="detail-content">
-          <div class="vendor-profile">
-            <div class="vp-row">
-              <div class="vp-item">
-                <label>Company Name</label>
-                <span>{{ selectedVendor.name }}</span>
-              </div>
-              <div class="vp-item">
-                <label>Assigned Project</label>
-                <span>{{ selectedVendor.project?.name || 'N/A' }}</span>
-              </div>
-            </div>
-            <div class="vp-row">
-              <div class="vp-item">
-                <label>Contact Person</label>
-                <span>{{ selectedVendor.contact_person || '-' }}</span>
-              </div>
-              <div class="vp-item">
-                <label>Phone / Contact</label>
-                <span>{{ selectedVendor.phone || '-' }}</span>
-              </div>
-            </div>
-          </div>
-          
-          <h4 class="section-title">Supplied Materials</h4>
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Material</th>
-                  <th>Unit Price</th>
-                  <th>Qty</th>
-                  <th class="text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!selectedVendor.materials || selectedVendor.materials.length === 0">
-                  <td colspan="4" class="text-center text-muted">No materials recorded.</td>
-                </tr>
-                <tr v-for="(mat, idx) in selectedVendor.materials" :key="idx">
-                  <td>{{ mat.material_name }}</td>
-                  <td class="text-muted">Rs. {{ Number(mat.unit_price).toLocaleString() }}</td>
-                  <td class="text-muted">{{ mat.quantity }}</td>
-                  <td class="text-right font-medium">Rs. {{ Number(mat.total_price).toLocaleString() }}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="3" class="text-right text-muted">Grand Total</td>
-                  <td class="text-right font-bold text-main">Rs. {{ calculateVendorTotal(selectedVendor.materials).toLocaleString() }}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. REGISTER VENDOR MODAL -->
-    <div v-if="showVendorModal" class="modal-backdrop" @click.self="showVendorModal = false">
-      <div class="modal-card wide">
-        <div class="modal-header">
-          <h3>Register Vendor</h3>
-          <button @click="showVendorModal = false" class="close-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-        <form @submit.prevent="saveVendor">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Vendor Name</label>
-              <input type="text" v-model="formV.name" class="styled-input" required placeholder="e.g. Acme Cement Co." />
-            </div>
-            <div class="form-group">
-              <label>Assigned Project</label>
-              <div class="select-wrapper">
-                <select v-model="formV.project_id" class="styled-input" required>
-                  <option value="" disabled>Select a Project</option>
-                  <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Contact Person</label>
-              <input type="text" v-model="formV.contact_person" class="styled-input" placeholder="Manager Name" />
-            </div>
-            <div class="form-group">
-              <label>Phone Number</label>
-              <input type="text" v-model="formV.phone" class="styled-input" placeholder="Contact number" />
-            </div>
-          </div>
-          <div class="material-builder">
-            <div class="builder-header">
-              <label>Materials Supplied</label>
-              <button type="button" @click="addMaterial" class="btn-text">+ Add Item</button>
-            </div>
-            <div class="builder-labels" v-if="formV.materials.length > 0">
-              <span>Item Name</span>
-              <span>Price/Unit</span>
-              <span>Qty</span>
-              <span></span>
-            </div>
-            <div v-for="(mat, idx) in formV.materials" :key="idx" class="builder-row">
-              <input type="text" v-model="mat.material_name" class="styled-input solid" placeholder="Cement, Steel..." required />
-              <input type="number" v-model="mat.unit_price" class="styled-input solid" placeholder="0.00" required min="0" />
-              <input type="number" v-model="mat.quantity" class="styled-input solid" placeholder="1" required min="1" />
-              <button type="button" @click="removeMaterial(idx)" class="btn-icon danger" title="Remove">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-          </div>
-          <button type="submit" class="btn primary full-width" :disabled="isSaving">
-            {{ isSaving ? 'Saving...' : 'Register Vendor' }}
-          </button>
-        </form>
-      </div>
-    </div>
-
-    <!-- 3. TRANSACTION MODAL -->
+    <!-- TRANSACTION MODAL -->
     <div v-if="showTransactionModal" class="modal-backdrop" @click.self="showTransactionModal = false">
       <div class="modal-card">
         <div class="modal-header">
@@ -472,7 +347,6 @@ import { useAuth } from '../useAuth';
 
 const { isAdmin, loadUser } = useAuth();
 const summary = ref({});
-const vendors = ref([]);
 const employees = ref([]);
 const projects = ref([]);
 
@@ -663,14 +537,9 @@ const materialChartOptions = ref({
     }
 });
 
-const showVendorModal = ref(false);
 const showTransactionModal = ref(false);
-const showDetailModal = ref(false);
-const selectedVendor = ref(null);
-const isSaving = ref(false);
 const currentMonthLabel = ref(new Date().toLocaleString('default', { month: 'long', year: 'numeric' }));
 
-const formV = ref({ name: '', project_id: '', contact_person: '', phone: '', materials:[{ material_name: '', unit_price: '', quantity: '' }] });
 const formT = ref({ type: 'expense', amount: '', category: '', project_id: '', date: new Date().toISOString().split('T')[0], description: '' });
 
 const clearFilters = () => {
@@ -691,10 +560,7 @@ const loadData = async () => {
         params.project_id = filters.value.project_id;
     }
 
-    const commonReqs =[
-      axios.get('/finance/vendors'),
-      axios.get('/projects')
-    ];
+    const commonReqs = [axios.get('/projects')];
 
     if (isAdmin.value) {
       commonReqs.push(axios.get('/finance/summary', { params }));
@@ -702,12 +568,11 @@ const loadData = async () => {
     }
 
     const responses = await Promise.all(commonReqs);
-    vendors.value = responses[0].data || [];
-    projects.value = responses[1].data ||[];
+    projects.value = responses[0].data ||[];
 
     if (isAdmin.value) {
-      summary.value = responses[2].data || {};
-      employees.value = responses[3].data ||[];
+      summary.value = responses[1].data || {};
+      employees.value = responses[2].data ||[];
 
       const stats = summary.value.project_monthly_stats ||[];
       const catStats = summary.value.category_breakdown || [];
@@ -749,23 +614,6 @@ const loadData = async () => {
   }
 };
 
-const viewVendor = (vendor) => { selectedVendor.value = vendor; showDetailModal.value = true; };
-const addMaterial = () => { formV.value.materials.push({ material_name: '', unit_price: '', quantity: '' }); };
-const removeMaterial = (idx) => {
-  if (formV.value.materials.length > 1) { formV.value.materials.splice(idx, 1); }
-};
-
-const saveVendor = async () => {
-  isSaving.value = true;
-  try {
-    await axios.post('/finance/vendors', formV.value);
-    showVendorModal.value = false;
-    formV.value = { name: '', project_id: '', contact_person: '', phone: '', materials:[{ material_name: '', unit_price: '', quantity: '' }] };
-    loadData();
-  } catch (e) { alert("Failed to save vendor."); }
-  finally { isSaving.value = false; }
-};
-
 const processSalary = async (emp) => {
   if (confirm(`Process salary payment of Rs. ${emp.salary_amount} for ${emp.name}?`)) {
     try {
@@ -789,8 +637,6 @@ const saveTransaction = async () => {
     loadData();
   } catch (e) { alert("Failed to save transaction."); }
 };
-
-const calculateVendorTotal = (mats) => mats?.reduce((acc, m) => acc + parseFloat(m.total_price || 0), 0) || 0;
 
 onMounted(() => {
   loadData();
@@ -1115,16 +961,25 @@ textarea.styled-input { height: auto; }
 .status-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; }
 .status-badge.success { background: rgba(16, 185, 129, 0.1); color: #059669; }
 
-/* VENDOR LIST */
-.vendor-list { display: flex; flex-direction: column; overflow-y: auto; max-height: 450px; }
-.vendor-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 30px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s; }
-.vendor-item:last-child { border-bottom: none; }
-.vendor-item:hover { background: color-mix(in srgb, var(--bg-surface) 78%, var(--bg-input) 22%); }
-.v-info { display: flex; flex-direction: column; gap: 6px; }
-.v-info h3 { margin: 0; font-size: 1.05rem; color: var(--text-main); font-weight: 700; }
-.v-project { font-size: 0.85rem; color: var(--primary); font-weight: 600; }
-.v-meta { font-size: 0.8rem; color: var(--text-secondary); }
-.v-amount { font-weight: 800; font-size: 1.1rem; color: var(--text-main); }
+/* ACTIVITY LIST */
+.activity-list { display: flex; flex-direction: column; overflow-y: auto; max-height: 450px; }
+.activity-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 30px; border-bottom: 1px solid var(--border); transition: background 0.2s; }
+.activity-item:last-child { border-bottom: none; }
+.activity-item:hover { background: color-mix(in srgb, var(--bg-surface) 78%, var(--bg-input) 22%); }
+.activity-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.activity-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.activity-type { padding: 5px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+.activity-type.income { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.activity-type.expense,
+.activity-type.pre-payment { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.activity-date { font-size: 0.82rem; color: var(--text-secondary); }
+.activity-main h3 { margin: 0; font-size: 1.02rem; color: var(--text-main); font-weight: 700; }
+.activity-project { font-size: 0.86rem; color: var(--primary); font-weight: 600; }
+.activity-description { margin: 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55; max-width: 520px; }
+.activity-amount { font-weight: 800; font-size: 1.05rem; white-space: nowrap; }
+.activity-amount.income { color: #059669; }
+.activity-amount.expense,
+.activity-amount.pre-payment { color: #dc2626; }
 
 /* =========================================
    MODALS

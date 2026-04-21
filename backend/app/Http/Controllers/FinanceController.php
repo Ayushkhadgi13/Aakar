@@ -15,10 +15,69 @@ use Illuminate\Support\Facades\DB;
 
 class FinanceController extends Controller
 {
+    private function getMonthNameExpression(string $column): string
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "CASE CAST(strftime('%m', {$column}) AS INTEGER)
+                WHEN 1 THEN 'January'
+                WHEN 2 THEN 'February'
+                WHEN 3 THEN 'March'
+                WHEN 4 THEN 'April'
+                WHEN 5 THEN 'May'
+                WHEN 6 THEN 'June'
+                WHEN 7 THEN 'July'
+                WHEN 8 THEN 'August'
+                WHEN 9 THEN 'September'
+                WHEN 10 THEN 'October'
+                WHEN 11 THEN 'November'
+                WHEN 12 THEN 'December'
+            END";
+        }
+
+        return "MONTHNAME({$column})";
+    }
+
+    private function getMonthNumberExpression(string $column): string
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "CAST(strftime('%m', {$column}) AS INTEGER)";
+        }
+
+        return "MONTH({$column})";
+    }
+
+    private function getShortMonthExpression(string $column): string
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "CASE CAST(strftime('%m', {$column}) AS INTEGER)
+                WHEN 1 THEN 'Jan'
+                WHEN 2 THEN 'Feb'
+                WHEN 3 THEN 'Mar'
+                WHEN 4 THEN 'Apr'
+                WHEN 5 THEN 'May'
+                WHEN 6 THEN 'Jun'
+                WHEN 7 THEN 'Jul'
+                WHEN 8 THEN 'Aug'
+                WHEN 9 THEN 'Sep'
+                WHEN 10 THEN 'Oct'
+                WHEN 11 THEN 'Nov'
+                WHEN 12 THEN 'Dec'
+            END";
+        }
+
+        return "DATE_FORMAT({$column}, '%b')";
+    }
+
     public function getSummary(Request $request)
     {
         $query = Transaction::query();
         $matQuery = VendorMaterial::query();
+        $projectMonthNameExpression = $this->getMonthNameExpression('transactions.date');
+        $projectMonthNumberExpression = $this->getMonthNumberExpression('transactions.date');
+        $monthLabelExpression = $this->getShortMonthExpression('date');
+        $monthNumberExpression = $this->getMonthNumberExpression('date');
+        $activityQuery = Transaction::query();
+        $activityPeriodLabel = Carbon::now()->format('F Y');
 
         $allTimeIncome = (float) Transaction::where('type', 'income')->sum('amount');
         $allTimeExpense = (float) Transaction::where('type', 'expense')->sum('amount');
@@ -31,6 +90,15 @@ class FinanceController extends Controller
                 $request->start_date . ' 00:00:00',
                 $request->end_date . ' 23:59:59',
             ]);
+            $activityQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+            $activityPeriodLabel = Carbon::parse($request->start_date)->format('d M Y')
+                . ' - '
+                . Carbon::parse($request->end_date)->format('d M Y');
+        } else {
+            $activityQuery->whereBetween('date', [
+                Carbon::now()->startOfMonth()->toDateString(),
+                Carbon::now()->endOfMonth()->toDateString(),
+            ]);
         }
 
         if ($request->filled('project_id')) {
@@ -38,6 +106,7 @@ class FinanceController extends Controller
             $matQuery->whereHas('vendor', function ($builder) use ($request) {
                 $builder->where('project_id', $request->project_id);
             });
+            $activityQuery->where('project_id', $request->project_id);
         }
 
         $income = (float) (clone $query)->where('type', 'income')->sum('amount');
@@ -46,8 +115,8 @@ class FinanceController extends Controller
 
         $projectMonthlyStats = Transaction::leftJoin('projects', 'transactions.project_id', '=', 'projects.id')
             ->select(
-                DB::raw('MONTHNAME(transactions.date) as month'),
-                DB::raw('MONTH(transactions.date) as month_num'),
+                DB::raw("{$projectMonthNameExpression} as month"),
+                DB::raw("{$projectMonthNumberExpression} as month_num"),
                 DB::raw('COALESCE(projects.name, "General / Unassigned") as project_name'),
                 DB::raw('SUM(transactions.amount) as cost')
             )
@@ -61,8 +130,8 @@ class FinanceController extends Controller
             ->get();
 
         $monthlyStats = Transaction::select(
-            DB::raw('DATE_FORMAT(date, "%b") as month'),
-            DB::raw('MONTH(date) as month_num'),
+            DB::raw("{$monthLabelExpression} as month"),
+            DB::raw("{$monthNumberExpression} as month_num"),
             DB::raw('SUM(CASE WHEN type = "income" THEN amount ELSE 0 END) as income'),
             DB::raw('SUM(CASE WHEN type IN ("expense", "pre-payment") THEN amount ELSE 0 END) as expense')
         )
@@ -93,6 +162,12 @@ class FinanceController extends Controller
             'project_monthly_stats' => $projectMonthlyStats,
             'category_breakdown' => $categoryBreakdown,
             'material_breakdown' => $materialBreakdown,
+            'activity_period_label' => $activityPeriodLabel,
+            'monthly_activity' => $activityQuery
+                ->with(['project:id,name', 'vendor:id,name'])
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get(),
             'recent_transactions' => (clone $query)->orderByDesc('date')->take(5)->get(),
         ]);
     }
