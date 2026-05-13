@@ -1,4 +1,4 @@
-FROM php:8.2-cli AS vendor
+FROM php:8.4-cli AS vendor
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
-FROM php:8.2-cli
+FROM php:8.4-cli
 
 WORKDIR /app
 
