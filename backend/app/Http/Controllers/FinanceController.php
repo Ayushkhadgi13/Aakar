@@ -341,6 +341,64 @@ class FinanceController extends Controller
         );
     }
 
+    public function getMonthlyReportDetails(Request $request, $id)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $report = MonthlyReport::findOrFail($id);
+
+        $baseQuery = Transaction::query()
+            ->whereYear('date', $report->year)
+            ->whereMonth('date', $report->month_number);
+
+        $categoryBreakdown = (clone $baseQuery)
+            ->select(
+                'category',
+                DB::raw('SUM(amount) as total'),
+                DB::raw('COUNT(*) as transaction_count')
+            )
+            ->groupBy('category')
+            ->orderByDesc('total')
+            ->get();
+
+        $typeBreakdown = (clone $baseQuery)
+            ->select(
+                'type',
+                DB::raw('SUM(amount) as total'),
+                DB::raw('COUNT(*) as transaction_count')
+            )
+            ->groupBy('type')
+            ->orderByDesc('total')
+            ->get();
+
+        $projectBreakdown = (clone $baseQuery)
+            ->leftJoin('projects', 'transactions.project_id', '=', 'projects.id')
+            ->select(
+                DB::raw('COALESCE(projects.name, "General / Unassigned") as project_name'),
+                DB::raw('SUM(transactions.amount) as total'),
+                DB::raw('COUNT(*) as transaction_count')
+            )
+            ->groupBy('projects.name')
+            ->orderByDesc('total')
+            ->get();
+
+        $transactions = (clone $baseQuery)
+            ->with(['project:id,name', 'vendor:id,name'])
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'report' => $report,
+            'category_breakdown' => $categoryBreakdown,
+            'type_breakdown' => $typeBreakdown,
+            'project_breakdown' => $projectBreakdown,
+            'transactions' => $transactions,
+        ]);
+    }
+
     public function generateMonthlyReports(Request $request)
     {
         if ($request->user()->role !== 'admin') {

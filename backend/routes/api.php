@@ -30,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/finance/vendors/{id}/materials', [FinanceController::class, 'addVendorMaterial']);
     Route::post('/finance/transactions', [FinanceController::class, 'storeTransaction']);
     Route::get('/reports/monthly', [FinanceController::class, 'getMonthlyReports']);
+    Route::get('/reports/monthly/{id}', [FinanceController::class, 'getMonthlyReportDetails']);
     Route::post('/reports/monthly/generate', [FinanceController::class, 'generateMonthlyReports']);
 
     Route::get('/finance/employees', [FinanceController::class, 'getEmployees']);
