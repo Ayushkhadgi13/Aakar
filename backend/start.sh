@@ -63,5 +63,6 @@ php artisan cache:clear
 
 php artisan migrate --force
 php artisan db:seed --force
+php artisan reports:generate-monthly || true
 
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-10000}"
