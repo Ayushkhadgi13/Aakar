@@ -19,10 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-
 COPY . .
-RUN composer dump-autoload --optimize --no-dev
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
 FROM php:8.4-cli
 
