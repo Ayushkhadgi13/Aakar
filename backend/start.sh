@@ -11,8 +11,6 @@ if [ -z "$APP_KEY" ]; then
   php artisan key:generate --force
 fi
 
-touch database/database.sqlite
-
 php artisan migrate --force
 php artisan db:seed --force
 
