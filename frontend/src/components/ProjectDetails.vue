@@ -338,6 +338,9 @@ import apexchart from 'vue3-apexcharts';
 import MaterialComparison from './MaterialComparison.vue';
 import { useAuth } from '../useAuth';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').replace(/\/+$/, '');
+const APP_BASE_URL = API_BASE_URL.replace(/\/api$/, '');
+
 const route = useRoute();
 const { user, loadUser } = useAuth();
 
@@ -442,7 +445,7 @@ const getPhaseName = (progressValue) => {
 
 const formatDate = (date) => (date ? new Date(date).toLocaleDateString() : 'N/A');
 const formatTime = (date) => new Date(date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const getImageUrl = (path) => `http://127.0.0.1:8000${path}`;
+const getImageUrl = (path) => `${APP_BASE_URL}${path}`;
 
 const fetchDetails = async () => {
   await loadUser();
