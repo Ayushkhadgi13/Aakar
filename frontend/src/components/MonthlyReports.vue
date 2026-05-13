@@ -7,6 +7,9 @@
         <p>Review the auto-generated financial snapshot for each closed month.</p>
       </div>
       <div class="header-right">
+        <button class="btn primary" @click="generateReports" :disabled="isGenerating">
+          {{ isGenerating ? 'Generating...' : 'Generate Latest Report' }}
+        </button>
         <div class="header-stats">
           <div class="stat-chip">
             <span class="stat-label">Reports</span>
@@ -62,6 +65,7 @@ import { useAuth } from '../useAuth';
 const router = useRouter();
 const { isAdmin, loadUser } = useAuth();
 const reports = ref([]);
+const isGenerating = ref(false);
 
 const formatMoney = (value) => Number(value || 0).toLocaleString();
 
@@ -74,6 +78,18 @@ const fetchReports = async () => {
 
   const response = await axios.get('/reports/monthly');
   reports.value = response.data;
+};
+
+const generateReports = async () => {
+  isGenerating.value = true;
+  try {
+    const response = await axios.post('/reports/monthly/generate');
+    reports.value = response.data.reports || [];
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to generate monthly reports.');
+  } finally {
+    isGenerating.value = false;
+  }
 };
 
 onMounted(fetchReports);
@@ -90,6 +106,9 @@ onMounted(fetchReports);
 .stat-chip { min-width: 122px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; gap: 4px; }
 .stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .stat-chip strong { font-size: 1.1rem; color: var(--text-main); line-height: 1; }
+.btn { padding: 0 18px; height: 44px; border-radius: 12px; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; }
+.btn.primary { background: var(--primary); color: white; }
+.btn:disabled { opacity: 0.7; cursor: wait; }
 
 .table-container { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
 .table-header { padding: 22px 24px 18px; border-bottom: 1px solid var(--border); }

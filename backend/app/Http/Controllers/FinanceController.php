@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Console\Commands\GenerateMonthlyReports;
 use App\Models\Employee;
 use App\Models\MonthlyReport;
 use App\Models\Transaction;
@@ -11,6 +12,7 @@ use App\Models\VendorMaterial;
 use App\Notifications\SalaryPaid;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 class FinanceController extends Controller
@@ -337,5 +339,22 @@ class FinanceController extends Controller
                 ->orderByDesc('month_number')
                 ->get()
         );
+    }
+
+    public function generateMonthlyReports(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        Artisan::call('reports:generate-monthly');
+
+        return response()->json([
+            'message' => trim(Artisan::output()) ?: 'Monthly report generated.',
+            'reports' => MonthlyReport::query()
+                ->orderByDesc('year')
+                ->orderByDesc('month_number')
+                ->get(),
+        ]);
     }
 }
